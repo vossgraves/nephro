@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Reveal from "@/components/Reveal";
 import Hero from "@/components/hero/Hero";
 import {
   albStage,
@@ -57,7 +58,7 @@ export default function LandingPage() {
         <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-primary">
           Every number on this page was computed, not generated
         </p>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
+        <Reveal stagger className="mt-10 grid gap-5 md:grid-cols-3">
           {FEATURES.map((f) => (
             <article
               key={f.title}
@@ -83,10 +84,10 @@ export default function LandingPage() {
               <p className="mt-1 text-xs text-muted tabular-nums">{f.note}</p>
             </article>
           ))}
-        </div>
+        </Reveal>
       </section>
 
-      <section className="border-y border-border bg-surface/60">
+      <Reveal as="section" delay={100} className="border-y border-border bg-surface/60">
         <div className="mx-auto grid max-w-5xl gap-10 px-6 py-20 md:grid-cols-2 md:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
@@ -140,9 +141,9 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="px-6 py-24 text-center">
+      <Reveal as="section" delay={100} className="px-6 py-24 text-center">
         <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">
           Run it on a real patient, right now.
         </h2>
@@ -163,7 +164,7 @@ export default function LandingPage() {
             View patient records
           </Link>
         </div>
-      </section>
+      </Reveal>
     </>
   );
 }

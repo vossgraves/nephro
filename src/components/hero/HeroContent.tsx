@@ -1,6 +1,6 @@
 "use client";
 
-import { animate, createTimeline, stagger } from "animejs";
+import { animate, createTimeline, stagger, utils } from "animejs";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -12,8 +12,16 @@ function LiveExample() {
   const cc = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const count = (el: HTMLSpanElement | null, to: number, digits: number, delay: number) => {
       if (!el) return;
+      if (reduced) {
+        el.textContent = to.toFixed(digits);
+        return;
+      }
+      let cancelled = false;
       const o = { n: 0 };
       animate(o, {
         n: to,
@@ -21,13 +29,17 @@ function LiveExample() {
         delay,
         ease: "outExpo",
         onUpdate: () => {
-          el.textContent = o.n.toFixed(digits);
+          if (!cancelled) el.textContent = o.n.toFixed(digits);
         },
       });
+      return () => {
+        cancelled = true;
+      };
     };
-    count(egfr.current, 55.1, 1, 0);
-    count(risk.current, 3.4, 1, 300);
-    count(cc.current, 71, 0, 600);
+    const cleanup = [count(egfr.current, 55.1, 1, 0), count(risk.current, 3.4, 1, 300), count(cc.current, 71, 0, 600)];
+    return () => {
+      cleanup.forEach((fn) => fn?.());
+    };
   }, []);
 
   return (
@@ -58,15 +70,21 @@ export default function HeroContent() {
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const t = createTimeline({ delay: 250 });
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      utils.set(".hero-line, .hero-fade, .hero-badge", { opacity: 1, translateY: 0, scale: 1 });
+      return;
+    }
+    const t = createTimeline({ delay: 150 });
     t.add(
       ".hero-line",
       {
         translateY: [40, 0],
         opacity: [0, 1],
+        filter: ["blur(6px)", "blur(0px)"],
         duration: 900,
-        ease: "outExpo",
-        delay: stagger(140),
+        ease: "out(3)",
+        delay: stagger(110),
       },
     );
     t.add(
@@ -76,8 +94,9 @@ export default function HeroContent() {
         translateY: [20, 0],
         duration: 800,
         ease: "outCubic",
-        delay: stagger(120),
+        delay: stagger(100),
       },
+      "-=550",
     );
     t.add(
       ".hero-badge",
@@ -86,8 +105,9 @@ export default function HeroContent() {
         scale: [0.8, 1],
         duration: 500,
         ease: "outBack",
-        delay: stagger(90, { from: "center" }),
+        delay: stagger(70, { from: "center" }),
       },
+      "-=550",
     );
     return () => {
       t.pause();
@@ -106,7 +126,7 @@ export default function HeroContent() {
         </span>
       </div>
 
-      <h1 className="hero-line mt-6 max-w-3xl text-balance text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-6xl">
+      <h1 className="hero-line mt-6 max-w-3xl text-balance text-4xl font-bold leading-[1.08] tracking-tight text-white opacity-0 sm:text-6xl">
         Kidney numbers,
         <br />
         <span className="bg-gradient-to-r from-teal-300 via-cyan-300 to-emerald-300 bg-clip-text text-transparent">
@@ -114,13 +134,13 @@ export default function HeroContent() {
         </span>
       </h1>
 
-      <p className="hero-fade mt-6 max-w-xl text-pretty text-base leading-relaxed text-white/65 sm:text-lg">
+      <p className="hero-fade mt-6 max-w-xl text-pretty text-base leading-relaxed text-white/65 opacity-0 sm:text-lg">
         The calculators every nephrology guideline actually trusts — CKD-EPI 2021 eGFR, the
         Kidney Failure Risk Equation, and KDIGO staging. Real math, real citations, zero training
         data, zero black boxes.
       </p>
 
-      <div className="hero-fade mt-9 flex flex-wrap items-center justify-center gap-3">
+      <div className="hero-fade mt-9 flex flex-wrap items-center justify-center gap-3 opacity-0">
         <Link
           href="/calculator"
           className="rounded-[var(--radius-base)] bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-black/20 transition-transform hover:scale-[1.03] active:scale-[0.98]"
