@@ -12,6 +12,8 @@ import {
   akiStage,
   scrToMgDl,
   acrToMgG,
+  checkRange,
+  LIMITS,
 } from "./renal";
 
 const near = (a: number, b: number, tol: number, what: string) =>
@@ -90,5 +92,20 @@ assert.equal(
   akiStage({ scrMgDl: 1.3, baselineScrMgDl: 1.0, urineOutputMlKgH: 0.2, oliguriaHours: 24 }),
   3,
 );
+
+/* ---- input range guards ------------------------------------------------- */
+// Regression: a creatinine of 0.02 mg/dL (a mistyped or wrong-unit value) used to
+// produce eGFR 236-608 — an impossible number rendered with full confidence.
+assert.ok(checkRange("scrMgDl", 0.02), "implausibly low creatinine must be rejected");
+assert.ok(checkRange("scrMgDl", scrToMgDl(1.4)), "1.4 read as umol/L must be rejected");
+assert.ok(checkRange("scrMgDl", 40), "implausibly high creatinine must be rejected");
+assert.equal(checkRange("scrMgDl", 1.4), null, "a normal creatinine must pass");
+assert.equal(checkRange("scrMgDl", scrToMgDl(124)), null, "124 umol/L is ~1.4 mg/dL");
+// The equation must never be reachable with a value that yields a fantasy eGFR.
+assert.ok(egfrCkdEpi2021(LIMITS.scrMgDl.min, 18, "female") < 400);
+assert.ok(checkRange("ageYears", 4), "paediatric age is out of scope for CKD-EPI adult");
+assert.ok(checkRange("acrMgG", 99999), "absurd uACR must be rejected");
+assert.equal(checkRange("acrMgG", 180), null);
+assert.equal(checkRange("weightKg", 70), null);
 
 console.log("all renal equation checks passed");

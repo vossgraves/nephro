@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { KdigoHeatmap } from "@/components/KdigoHeatmap";
-import { Card, Field, inputClass } from "@/components/Field";
+import { Card, Field, InputGroup, inputClass, unitSelectClass } from "@/components/Field";
 import { saveRecord } from "@/app/records/actions";
 import {
   RISK_LABEL,
   acrToMgG,
   akiStage,
   albStage,
+  checkRange,
   cockcroftGault,
   egfrCkdEpi2021,
   gfrStage,
@@ -69,6 +70,32 @@ export default function CalculatorPage() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  /**
+   * Validation runs before any equation. An out-of-range creatinine (usually the
+   * wrong unit) previously produced results like eGFR 608 — impossible values
+   * presented with full confidence. Now it reports the field instead.
+   */
+  const errors = useMemo(() => {
+    const out: Partial<Record<"age" | "scr" | "acr" | "weight", string>> = {};
+    const ageN = Number(age);
+    const scrRaw = Number(scr);
+    const acrRaw = Number(acr);
+    const weightN = Number(weight);
+    if (age.trim() !== "") out.age = checkRange("ageYears", ageN) ?? undefined;
+    if (weight.trim() !== "") out.weight = checkRange("weightKg", weightN) ?? undefined;
+    if (scr.trim() !== "") {
+      const mgdl = scrUnit === "umol" ? scrToMgDl(scrRaw) : scrRaw;
+      out.scr = checkRange("scrMgDl", mgdl) ?? undefined;
+    }
+    if (acr.trim() !== "") {
+      const mgg = acrUnit === "mgmmol" ? acrToMgG(acrRaw) : acrRaw;
+      out.acr = checkRange("acrMgG", mgg) ?? undefined;
+    }
+    return out;
+  }, [age, weight, scr, scrUnit, acr, acrUnit]);
+
+  const hasErrors = Object.values(errors).some(Boolean);
+
   const r = useMemo(() => {
     const ageN = Number(age);
     const scrRaw = Number(scr);
@@ -77,6 +104,15 @@ export default function CalculatorPage() {
     if (!(ageN > 0 && scrRaw > 0 && acrRaw > 0 && weightN > 0)) return null;
     const scrMgDl = scrUnit === "umol" ? scrToMgDl(scrRaw) : scrRaw;
     const acrMgG = acrUnit === "mgmmol" ? acrToMgG(acrRaw) : acrRaw;
+    // Guard the equations themselves — never render an implausible result.
+    if (
+      checkRange("ageYears", ageN) ||
+      checkRange("weightKg", weightN) ||
+      checkRange("scrMgDl", scrMgDl) ||
+      checkRange("acrMgG", acrMgG)
+    ) {
+      return null;
+    }
     const egfr = egfrCkdEpi2021(scrMgDl, ageN, sex);
     const crcl = cockcroftGault(ageN, weightN, scrMgDl, sex);
     const g = gfrStage(egfr);
@@ -171,12 +207,14 @@ export default function CalculatorPage() {
                   <option value="male">Male</option>
                 </select>
               </Field>
-              <Field label="Age (years)" htmlFor="age">
+              <Field label="Age (years)" htmlFor="age" error={errors.age}>
                 <input
                   id="age"
                   type="number"
                   min={18}
                   max={120}
+                  inputMode="numeric"
+                  aria-invalid={errors.age ? true : undefined}
                   className={inputClass}
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
@@ -188,33 +226,43 @@ export default function CalculatorPage() {
                 label="Serum creatinine"
                 htmlFor="scr"
                 hint="Standardized (IDMS) value."
+                error={errors.scr}
               >
-                <div className="flex gap-1.5">
+                <InputGroup>
                   <input
                     id="scr"
                     type="number"
                     min={0.1}
                     step="any"
+                    inputMode="decimal"
+                    aria-invalid={errors.scr ? true : undefined}
                     className={inputClass}
                     value={scr}
                     onChange={(e) => setScr(e.target.value)}
                   />
                   <select
                     aria-label="Creatinine unit"
-                    className={`${inputClass} w-28`}
+                    className={unitSelectClass}
                     value={scrUnit}
                     onChange={(e) => setScrUnit(e.target.value as ScrUnit)}
                   >
                     <option value="mgdl">mg/dL</option>
                     <option value="umol">µmol/L</option>
                   </select>
-                </div>
+                </InputGroup>
               </Field>
-              <Field label="Weight (kg)" htmlFor="weight" hint="Used for Cockcroft–Gault.">
+              <Field
+                label="Weight (kg)"
+                htmlFor="weight"
+                hint="Used for Cockcroft–Gault."
+                error={errors.weight}
+              >
                 <input
                   id="weight"
                   type="number"
                   min={1}
+                  inputMode="decimal"
+                  aria-invalid={errors.weight ? true : undefined}
                   className={inputClass}
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
@@ -222,27 +270,34 @@ export default function CalculatorPage() {
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Urine ACR" htmlFor="acr" hint="Albumin-to-creatinine ratio.">
-                <div className="flex gap-1.5">
+              <Field
+                label="Urine ACR"
+                htmlFor="acr"
+                hint="Albumin-to-creatinine ratio."
+                error={errors.acr}
+              >
+                <InputGroup>
                   <input
                     id="acr"
                     type="number"
                     min={0.1}
                     step="any"
+                    inputMode="decimal"
+                    aria-invalid={errors.acr ? true : undefined}
                     className={inputClass}
                     value={acr}
                     onChange={(e) => setAcr(e.target.value)}
                   />
                   <select
                     aria-label="ACR unit"
-                    className={`${inputClass} w-28`}
+                    className={unitSelectClass}
                     value={acrUnit}
                     onChange={(e) => setAcrUnit(e.target.value as AcrUnit)}
                   >
                     <option value="mgg">mg/g</option>
                     <option value="mgmmol">mg/mmol</option>
                   </select>
-                </div>
+                </InputGroup>
               </Field>
               <Field label="Region" htmlFor="region" hint="KFRE calibration factor.">
                 <select
@@ -317,7 +372,9 @@ export default function CalculatorPage() {
           >
             {!r ? (
               <p className="text-sm text-muted">
-                Enter age, creatinine, and uACR to see results.
+                {hasErrors
+                  ? "One or more values are outside physiological range — results are withheld rather than showing an impossible number. Check the highlighted fields and the selected units."
+                  : "Enter age, weight, creatinine, and uACR to see results."}
               </p>
             ) : (
               <div className="space-y-6">

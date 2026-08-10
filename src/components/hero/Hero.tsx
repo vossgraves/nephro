@@ -1,16 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import HeroContent from "@/components/hero/HeroContent";
 
 const KidneyScene = dynamic(() => import("@/components/hero/KidneyScene"), {
   ssr: false,
   loading: () => null,
 });
 
-const HeroContent = dynamic(() => import("@/components/hero/HeroContent"), {
-  ssr: false,
-  loading: () => null,
-});
+// ponytail: HeroContent is server-rendered on purpose — only the WebGL canvas
+// needs ssr:false. Deferring the copy caused a blank hero on first paint.
 
 export default function Hero() {
   return (

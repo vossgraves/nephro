@@ -12,6 +12,42 @@ export const scrToMgDl = (umolL: number) => umolL / 88.4;
 /** uACR mg/mmol -> mg/g (KDIGO conversion factor 8.84). */
 export const acrToMgG = (mgMmol: number) => mgMmol * 8.84;
 
+/**
+ * Physiological input bounds. A calculator that prints eGFR 608 for a mistyped
+ * creatinine is worse than one that refuses: the number looks authoritative and
+ * is clinically meaningless. Anything outside these ranges is a data-entry error
+ * (most often the wrong unit selected), so we reject instead of computing.
+ * Ranges are deliberately generous — wider than any survivable physiology.
+ */
+export const LIMITS = {
+  /** Lowest recorded adult values sit near 0.2 mg/dL; dialysis peaks below 25. */
+  scrMgDl: { min: 0.2, max: 25 },
+  ageYears: { min: 18, max: 120 },
+  weightKg: { min: 20, max: 400 },
+  /** uACR: nephrotic-range proteinuria tops out well below 25 000 mg/g. */
+  acrMgG: { min: 0.1, max: 25000 },
+} as const;
+
+export type FieldName = keyof typeof LIMITS;
+
+/** Returns an error message for an out-of-range value, or null when acceptable. */
+export function checkRange(field: FieldName, value: number): string | null {
+  const { min, max } = LIMITS[field];
+  if (!Number.isFinite(value)) return "Enter a number.";
+  if (value < min || value > max) {
+    const unit =
+      field === "scrMgDl"
+        ? " mg/dL"
+        : field === "acrMgG"
+          ? " mg/g"
+          : field === "weightKg"
+            ? " kg"
+            : " years";
+    return `Must be between ${min}${unit} and ${max}${unit} — check the unit.`;
+  }
+  return null;
+}
+
 /* ------------------------------------------------------------- CKD-EPI -- */
 
 /**
