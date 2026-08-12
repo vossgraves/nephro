@@ -43,13 +43,13 @@ export default function HeroContent({ stats }: { stats: readonly HeroStat[] }) {
         >
           <Link
             href="/calculator"
-            className="rounded-[var(--radius-base)] bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 transition-transform duration-150 ease-out hover:scale-[1.02] hover:bg-slate-800 active:scale-[0.97]"
+            className="pressable rounded-[var(--radius-base)] bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/20"
           >
             Open calculator
           </Link>
           <Link
             href="/methods"
-            className="rounded-[var(--radius-base)] border border-slate-300 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm shadow-slate-950/5 backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white active:scale-[0.97]"
+            className="pressable rounded-[var(--radius-base)] border border-slate-300 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm shadow-slate-950/5 backdrop-blur-sm hover:bg-white hover:shadow-md hover:shadow-slate-950/5"
           >
             See the methods
           </Link>

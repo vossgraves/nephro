@@ -1,0 +1,15 @@
+[
+  {
+    "antipattern": "bounce-easing",
+    "name": "Bounce or elastic easing",
+    "description": "Bounce and elastic easing feel dated and tacky. Real objects decelerate smoothly — use exponential easing (ease-out-quart/quint/expo) instead.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "/home/ubuntu/nephro/src/app/globals.css",
+    "line": 18,
+    "snippet": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    "importedBy": [
+      "layout.tsx"
+    ]
+  }
+]

@@ -7,6 +7,6 @@ const KidneyScene = dynamic(() => import("@/components/hero/KidneyScene"), {
   loading: () => null,
 });
 
-export default function HeroScene() {
-  return <KidneyScene />;
+export default function HeroScene({ className }: { className?: string }) {
+  return <KidneyScene className={className} />;
 }

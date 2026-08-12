@@ -1,0 +1,182 @@
+import { NextResponse } from "next/server";
+import {
+  ImagingModality,
+  MAX_ANALYSIS_FILE_BYTES,
+  normalizeReport,
+  parseJsonObject,
+  RecognitionProvider,
+  RecognitionRequest,
+  recognitionSystemPrompt,
+} from "@/lib/imaging-recognition";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const ALLOWED_MODALITIES = new Set<ImagingModality>(["xray", "ultrasound", "ct-export", "mri-export", "other"]);
+
+function noStoreJson(body: unknown, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  headers.set("Cache-Control", "no-store, max-age=0");
+  return NextResponse.json(body, { ...init, headers });
+}
+
+function parseImageDataUrl(dataUrl: string) {
+  const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!match) throw new Error("Use a PNG, JPEG, or WebP image.");
+  const [, mimeType, base64] = match;
+  const estimatedBytes = Math.floor((base64.length * 3) / 4);
+  if (estimatedBytes > MAX_ANALYSIS_FILE_BYTES) {
+    throw new Error("For provider analysis, choose an image smaller than 4 MB.");
+  }
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) throw new Error("Unsupported image type.");
+  return { mimeType, base64 };
+}
+
+function configured(provider: RecognitionProvider) {
+  return provider === "openai" ? Boolean(process.env.OPENAI_API_KEY) : Boolean(process.env.GEMINI_API_KEY);
+}
+
+async function analyzeWithOpenAI(payload: RecognitionRequest) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
+  const model = process.env.OPENAI_VISION_MODEL || "gpt-5-mini";
+  const baseUrl = (process.env.OPENAI_API_BASE || "https://api.openai.com/v1").replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: recognitionSystemPrompt(payload.modality, payload.clinicalQuestion) },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Review this single exported image within the stated boundaries. Return only the requested JSON object." },
+            { type: "image_url", image_url: { url: payload.imageDataUrl, detail: "high" } },
+          ],
+        },
+      ],
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    await response.text();
+    throw new Error(`OPENAI_REQUEST_FAILED:${response.status}`);
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{ message?: { content?: string | Array<{ text?: string }> } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
+  const text = typeof content === "string"
+    ? content
+    : content?.map((part) => part.text || "").join("\n");
+  if (!text) throw new Error("OPENAI_EMPTY_RESPONSE");
+  return normalizeReport(parseJsonObject(text), "openai", model);
+}
+
+async function analyzeWithGemini(payload: RecognitionRequest) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_NOT_CONFIGURED");
+  const model = process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash";
+  const { mimeType, base64 } = parseImageDataUrl(payload.imageDataUrl);
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          role: "user",
+          parts: [
+            { text: recognitionSystemPrompt(payload.modality, payload.clinicalQuestion) },
+            { inline_data: { mime_type: mimeType, data: base64 } },
+          ],
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json",
+        },
+      }),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    await response.text();
+    throw new Error(`GEMINI_REQUEST_FAILED:${response.status}`);
+  }
+
+  const data = await response.json() as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("\n");
+  if (!text) throw new Error("GEMINI_EMPTY_RESPONSE");
+  return normalizeReport(parseJsonObject(text), "gemini", model);
+}
+
+export async function GET() {
+  return noStoreJson({
+    configured: {
+      openai: configured("openai"),
+      gemini: configured("gemini"),
+    },
+    maxImageBytes: MAX_ANALYSIS_FILE_BYTES,
+    privacy: "Images are sent to the selected configured provider only after client confirmation. The endpoint does not persist them.",
+  });
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json() as Partial<RecognitionRequest>;
+    const provider = body.provider;
+    const modality = body.modality;
+
+    if (provider !== "openai" && provider !== "gemini") {
+      return noStoreJson({ error: "Choose OpenAI Vision or Gemini Vision." }, { status: 400 });
+    }
+    if (!modality || !ALLOWED_MODALITIES.has(modality)) {
+      return noStoreJson({ error: "Choose an image modality." }, { status: 400 });
+    }
+    if (body.deidentifiedConfirmed !== true) {
+      return noStoreJson({ error: "Confirm that the image is de-identified before sending it to a provider." }, { status: 400 });
+    }
+    if (typeof body.imageDataUrl !== "string") {
+      return noStoreJson({ error: "Choose an image before requesting a review." }, { status: 400 });
+    }
+
+    parseImageDataUrl(body.imageDataUrl);
+    const payload: RecognitionRequest = {
+      provider,
+      modality,
+      imageDataUrl: body.imageDataUrl,
+      clinicalQuestion: typeof body.clinicalQuestion === "string" ? body.clinicalQuestion.slice(0, 600) : undefined,
+      deidentifiedConfirmed: true,
+    };
+
+    const report = provider === "openai"
+      ? await analyzeWithOpenAI(payload)
+      : await analyzeWithGemini(payload);
+
+    return noStoreJson({ report });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected analysis error.";
+    if (message === "OPENAI_NOT_CONFIGURED" || message === "GEMINI_NOT_CONFIGURED") {
+      return noStoreJson({
+        error: message === "OPENAI_NOT_CONFIGURED"
+          ? "OpenAI Vision is not configured on this deployment. Add OPENAI_API_KEY as a server-side environment variable."
+          : "Gemini Vision is not configured on this deployment. Add GEMINI_API_KEY as a server-side environment variable.",
+        code: "PROVIDER_NOT_CONFIGURED",
+      }, { status: 503 });
+    }
+    console.error("Imaging review request failed", { code: message.split(":")[0] });
+    return noStoreJson({ error: message.includes("REQUEST_FAILED") ? "The selected provider could not complete the review. Try again later or choose the other configured provider." : message }, { status: 422 });
+  }
+}

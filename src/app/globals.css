@@ -1,21 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --bg: oklch(0.982 0.003 250);
+  --bg: oklch(0.986 0.002 92);
   --surface: oklch(1 0 0);
-  --border: oklch(0.9 0.006 250);
-  --text: oklch(0.23 0.012 250);
+  --surface-raised: oklch(0.997 0.002 92);
+  --surface-inset: oklch(0.974 0.004 250);
+  --border: oklch(0.892 0.007 250);
+  --border-strong: oklch(0.81 0.012 250);
+  --text: oklch(0.218 0.012 250);
   --muted: oklch(0.49 0.012 250);
-  --primary: oklch(0.28 0.012 250);
+  --primary: oklch(0.286 0.014 250);
   --primary-fg: oklch(0.99 0 0);
-  --accent: oklch(0.42 0.012 250);
+  --accent: oklch(0.5 0.088 202);
+  --accent-soft: oklch(0.94 0.025 202);
   --low: oklch(0.78 0.04 150);
   --moderate: oklch(0.84 0.08 88);
   --high: oklch(0.72 0.12 56);
   --very-high: oklch(0.6 0.16 28);
-  --radius: 0.625rem;
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --radius: 0.75rem;
+  --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.035), 0 12px 28px rgba(15, 23, 42, 0.045);
+  --shadow-float: 0 12px 34px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
 }
 
 @theme inline {
@@ -43,10 +49,22 @@ html {
 }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 7%, transparent), transparent 28rem),
+    var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 22%, white);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 78%, white);
+  outline-offset: 3px;
 }
 
 /* Copy is visible without JavaScript. The entrance animation is enhancement only. */
@@ -58,28 +76,52 @@ body {
 
 @media (prefers-reduced-motion: no-preference) {
   .hero-ready .hero-reveal {
-    animation: hero-rise 760ms var(--ease-out-strong) backwards;
-    animation-delay: calc(var(--i, 0) * 90ms);
+    animation: hero-rise 620ms var(--ease-out-strong) backwards;
+    animation-delay: calc(var(--i, 0) * 70ms);
   }
 
   .hero-ready .hero-pop {
-    animation: hero-pop 460ms var(--ease-out-back) backwards;
-    animation-delay: calc(320ms + var(--i, 0) * 45ms);
+    animation: hero-pop 340ms var(--ease-out-soft) backwards;
+    animation-delay: calc(250ms + var(--i, 0) * 38ms);
+  }
+
+  .pressable {
+    transition:
+      transform 160ms var(--ease-out-soft),
+      box-shadow 180ms var(--ease-out-soft),
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .pressable:active {
+    transform: scale(0.98);
   }
 }
 
 @keyframes hero-rise {
   from {
     opacity: 0;
-    transform: translateY(22px);
-    filter: blur(6px);
+    transform: translateY(16px);
+    filter: blur(4px);
   }
 }
 
 @keyframes hero-pop {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

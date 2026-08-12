@@ -4,14 +4,14 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-const TEAL = new THREE.Color("#1d8aa5");
-const GREEN = new THREE.Color("#3fbf8f");
-const RIM = new THREE.Color("#bfe9f0");
+const TEAL = new THREE.Color("#2f7e92");
+const GREEN = new THREE.Color("#6ba7a2");
+const RIM = new THREE.Color("#e2f3f5");
 
 const SIGNALS = [
-  { color: "#67e8f9", phase: 0.2 },
-  { color: "#5eead4", phase: 2.28 },
-  { color: "#a7f3d0", phase: 4.36 },
+  { color: "#4f9bb0", phase: 0.2 },
+  { color: "#71999a", phase: 2.28 },
+  { color: "#95b9bd", phase: 4.36 },
 ] as const;
 
 const VERTEX = /* glsl */ `
@@ -246,7 +246,7 @@ function OrbitSystem({ reduced }: { reduced: boolean }) {
   );
 }
 
-function Particles({ count = 520, reduced }: { count?: number; reduced: boolean }) {
+function Particles({ count = 280, reduced }: { count?: number; reduced: boolean }) {
   const points = useRef<THREE.Points>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
 
@@ -317,7 +317,7 @@ function Scene() {
   );
 }
 
-export default function KidneyScene() {
+export default function KidneyScene({ className = "absolute inset-0" }: { className?: string }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
 
@@ -333,12 +333,12 @@ export default function KidneyScene() {
   }, []);
 
   return (
-    <div ref={wrap} className="absolute inset-0" aria-hidden="true">
+    <div ref={wrap} className={className} aria-hidden="true">
       <Canvas
         frameloop={visible ? "always" : "never"}
         camera={{ position: [0, 0, 5.8], fov: 45 }}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-        dpr={[1, 1.75]}
+        dpr={[1, 1.5]}
         style={{ touchAction: "none" }}
       >
         <Scene />

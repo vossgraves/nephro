@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
 import Hero from "@/components/hero/Hero";
+import HeroScene from "@/components/hero/HeroScene";
 import type { HeroStat } from "@/components/hero/HeroStats";
 import {
   albStage,
@@ -156,7 +157,19 @@ export default function LandingPage() {
                 <span aria-hidden="true">→</span>
               </Link>
             </div>
-            <Reveal stagger as="div" className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-3">
+              <div className="relative min-h-48 overflow-hidden rounded-[calc(var(--radius-base)+5px)] border border-slate-200 bg-[radial-gradient(circle_at_50%_42%,#f3fbfb_0%,#edf4f4_42%,#e7eded_100%)] shadow-[var(--shadow-card)]">
+                <HeroScene className="absolute inset-0 opacity-90" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#e7eded] to-transparent" aria-hidden="true" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 p-4">
+                  <div>
+                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Interactive signal field</p>
+                    <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-slate-800">Three inputs, one traceable assessment.</p>
+                  </div>
+                  <span className="rounded-full border border-white/80 bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-sm backdrop-blur-sm">Explore</span>
+                </div>
+              </div>
+              <Reveal stagger as="div" className="grid gap-3 sm:grid-cols-2">
               {STEPS.map((step) => (
                 <article
                   key={step.number}
@@ -169,7 +182,8 @@ export default function LandingPage() {
                   <p className="mt-2 text-sm leading-relaxed text-muted">{step.body}</p>
                 </article>
               ))}
-            </Reveal>
+              </Reveal>
+            </div>
           </div>
         </div>
       </section>
