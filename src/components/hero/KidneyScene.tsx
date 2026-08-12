@@ -1,12 +1,18 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 const TEAL = new THREE.Color("#1d8aa5");
 const GREEN = new THREE.Color("#3fbf8f");
 const RIM = new THREE.Color("#bfe9f0");
+
+const SIGNALS = [
+  { color: "#67e8f9", phase: 0.2 },
+  { color: "#5eead4", phase: 2.28 },
+  { color: "#a7f3d0", phase: 4.36 },
+] as const;
 
 const VERTEX = /* glsl */ `
   uniform float uTime;
@@ -39,11 +45,10 @@ const VERTEX = /* glsl */ `
 
   vec3 displaced(vec3 p, vec3 n, float t) {
     float d = fbm(p * 1.1 + vec3(t, t * 0.7, -t));
-    // elongate into a kidney-ish form
     vec3 pos = p;
-    pos.x *= 1.25;
+    pos.x *= 1.18;
     pos.y += (fbm(vec3(pos.y * 2.0, 0.3, t)) - 0.5) * 0.35;
-    pos += n * d * 0.55;
+    pos += n * d * 0.48;
     return pos;
   }
 
@@ -52,7 +57,6 @@ const VERTEX = /* glsl */ `
     vec3 pos = displaced(position, normal, t);
     vDisp = fbm(position * 1.1 + vec3(t, t * 0.7, -t));
 
-    // perturbed normal via finite differences along two tangent directions
     vec3 n = normalize(normal);
     vec3 tangent = abs(n.y) < 0.999
       ? normalize(cross(vec3(0.0, 1.0, 0.0), n))
@@ -83,8 +87,8 @@ const FRAGMENT = /* glsl */ `
     vec3 viewDir = normalize(cameraPosition - vPos);
     float fresnel = pow(1.0 - clamp(dot(viewDir, normalize(vNormal)), 0.0, 1.0), 2.5);
     vec3 base = mix(uColorA, uColorB, clamp(vDisp * 1.6, 0.0, 1.0));
-    vec3 col = base + uRim * fresnel * (0.55 + 0.25 * sin(uTime * 1.5));
-    float alpha = 0.82 + 0.18 * fresnel;
+    vec3 col = base + uRim * fresnel * (0.52 + 0.22 * sin(uTime * 1.5));
+    float alpha = 0.8 + 0.18 * fresnel;
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -96,8 +100,8 @@ const PARTICLE_VERT = /* glsl */ `
 
   void main() {
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = (2.4 + sin(uTime * 2.0 + aPhase) * 1.4) * (6.0 / -mvPosition.z);
-    vAlpha = 0.5 + 0.15 * sin(uTime * 2.0 + aPhase * 2.0);
+    gl_PointSize = (2.1 + sin(uTime * 2.0 + aPhase) * 1.2) * (6.0 / -mvPosition.z);
+    vAlpha = 0.44 + 0.15 * sin(uTime * 2.0 + aPhase * 2.0);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -118,21 +122,19 @@ function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
 
   return reduced;
 }
 
-function KidneyBlob() {
+function KidneyCore({ reduced }: { reduced: boolean }) {
   const mesh = useRef<THREE.Mesh>(null);
-  const mat = useRef<THREE.ShaderMaterial>(null);
-  const reduced = useReducedMotion();
+  const material = useRef<THREE.ShaderMaterial>(null);
   const follow = useRef({ x: 0, y: 0 });
   const spin = useRef(0);
 
@@ -147,25 +149,25 @@ function KidneyBlob() {
   );
 
   useFrame((state, delta) => {
-    if (mat.current) mat.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
-    if (mesh.current) {
-      if (reduced) return;
-      spin.current += delta * 0.18;
-      const k = 1 - Math.exp(-4 * delta);
-      follow.current.x += (state.pointer.x * 0.35 - follow.current.x) * k;
-      follow.current.y += (state.pointer.y * 0.25 - follow.current.y) * k;
-      mesh.current.rotation.y = spin.current + follow.current.x;
-      mesh.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.12 + follow.current.y;
-      mesh.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.3) * 0.03;
-      mesh.current.position.y = Math.sin(state.clock.elapsedTime * 0.55) * 0.18;
-    }
+    if (material.current) material.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
+    if (!mesh.current || reduced) return;
+
+    const smoothing = 1 - Math.exp(-4 * delta);
+    spin.current += delta * 0.14;
+    follow.current.x += (state.pointer.x * 0.24 - follow.current.x) * smoothing;
+    follow.current.y += (state.pointer.y * 0.16 - follow.current.y) * smoothing;
+
+    mesh.current.rotation.y = spin.current + follow.current.x;
+    mesh.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.1 + follow.current.y;
+    mesh.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.3) * 0.025;
+    mesh.current.position.y = Math.sin(state.clock.elapsedTime * 0.55) * 0.15;
   });
 
   return (
-    <mesh ref={mesh} scale={2.1}>
-      <sphereGeometry args={[1, 96, 96]} />
+    <mesh ref={mesh} scale={2.02}>
+      <sphereGeometry args={[1, 72, 72]} />
       <shaderMaterial
-        ref={mat}
+        ref={material}
         uniforms={uniforms}
         vertexShader={VERTEX}
         fragmentShader={FRAGMENT}
@@ -176,28 +178,95 @@ function KidneyBlob() {
   );
 }
 
-function Particles({ count = 900 }: { count?: number }) {
+function SignalNode({ color, phase, reduced }: (typeof SIGNALS)[number] & { reduced: boolean }) {
+  const group = useRef<THREE.Group>(null);
+  const hovered = useRef(false);
+
+  useFrame((state, delta) => {
+    if (!group.current) return;
+
+    const t = reduced ? phase : state.clock.elapsedTime * 0.26 + phase;
+    const radius = 3.05;
+    group.current.position.set(
+      Math.cos(t) * radius,
+      Math.sin(t * 1.7 + phase) * 0.56,
+      Math.sin(t) * 0.64,
+    );
+
+    const target = hovered.current ? 1.45 : 1;
+    const next = group.current.scale.x + (target - group.current.scale.x) * (1 - Math.exp(-8 * delta));
+    group.current.scale.setScalar(next);
+  });
+
+  return (
+    <group ref={group}>
+      <mesh
+        onPointerOver={(event) => {
+          event.stopPropagation();
+          hovered.current = true;
+        }}
+        onPointerOut={() => {
+          hovered.current = false;
+        }}
+      >
+        <sphereGeometry args={[0.1, 20, 20]} />
+        <meshBasicMaterial color={color} transparent opacity={0.98} />
+      </mesh>
+      <mesh scale={2.5}>
+        <sphereGeometry args={[0.1, 16, 16]} />
+        <meshBasicMaterial color={color} transparent opacity={0.14} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function OrbitSystem({ reduced }: { reduced: boolean }) {
+  const orbit = useRef<THREE.Group>(null);
+
+  useFrame((state, delta) => {
+    if (!orbit.current || reduced) return;
+    orbit.current.rotation.y += delta * 0.055;
+    orbit.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.24) * 0.09;
+  });
+
+  return (
+    <group ref={orbit} rotation={[0.78, 0.18, -0.34]}>
+      <mesh>
+        <torusGeometry args={[3.05, 0.014, 8, 160]} />
+        <meshBasicMaterial color="#67e8f9" transparent opacity={0.42} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2.65, 0, 0]} scale={[1, 0.64, 1]}>
+        <torusGeometry args={[3.05, 0.009, 8, 160]} />
+        <meshBasicMaterial color="#6ee7b7" transparent opacity={0.24} />
+      </mesh>
+      {SIGNALS.map((signal) => (
+        <SignalNode key={signal.phase} {...signal} reduced={reduced} />
+      ))}
+    </group>
+  );
+}
+
+function Particles({ count = 520, reduced }: { count?: number; reduced: boolean }) {
   const points = useRef<THREE.Points>(null);
-  const mat = useRef<THREE.ShaderMaterial>(null);
-  const reduced = useReducedMotion();
+  const material = useRef<THREE.ShaderMaterial>(null);
 
   const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
+    const values = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      const r = 2.6 + Math.random() * 3.2;
+      const radius = 2.7 + Math.random() * 3.1;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      arr[i * 3 + 2] = r * Math.cos(phi);
+      values[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      values[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      values[i * 3 + 2] = radius * Math.cos(phi);
     }
-    return arr;
+    return values;
   }, [count]);
 
   const phases = useMemo(() => {
-    const arr = new Float32Array(count);
-    for (let i = 0; i < count; i++) arr[i] = Math.random() * Math.PI * 2;
-    return arr;
+    const values = new Float32Array(count);
+    for (let i = 0; i < count; i++) values[i] = Math.random() * Math.PI * 2;
+    return values;
   }, [count]);
 
   const uniforms = useMemo(
@@ -209,11 +278,10 @@ function Particles({ count = 900 }: { count?: number }) {
   );
 
   useFrame((state, delta) => {
-    if (mat.current) mat.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
-    if (points.current && !reduced) {
-      points.current.rotation.y += delta * 0.02;
-      points.current.rotation.x += Math.sin(state.clock.elapsedTime * 0.1) * delta * 0.01;
-    }
+    if (material.current) material.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
+    if (!points.current || reduced) return;
+    points.current.rotation.y += delta * 0.016;
+    points.current.rotation.x += Math.sin(state.clock.elapsedTime * 0.1) * delta * 0.008;
   });
 
   return (
@@ -223,7 +291,7 @@ function Particles({ count = 900 }: { count?: number }) {
         <bufferAttribute attach="attributes-aPhase" args={[phases, 1]} />
       </bufferGeometry>
       <shaderMaterial
-        ref={mat}
+        ref={material}
         uniforms={uniforms}
         vertexShader={PARTICLE_VERT}
         fragmentShader={PARTICLE_FRAG}
@@ -235,32 +303,45 @@ function Particles({ count = 900 }: { count?: number }) {
   );
 }
 
+function Scene() {
+  const reduced = useReducedMotion();
+  const viewport = useThree((state) => state.viewport);
+  const wide = viewport.width >= 7.2;
+
+  return (
+    <group position={[wide ? 1.42 : 0.08, 0, 0]} scale={wide ? 1 : 0.76}>
+      <KidneyCore reduced={reduced} />
+      <OrbitSystem reduced={reduced} />
+      <Particles reduced={reduced} />
+    </group>
+  );
+}
+
 export default function KidneyScene() {
   const wrap = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const el = wrap.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const obs = new IntersectionObserver(
+    const element = wrap.current;
+    if (!element || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
       (entries) => setVisible(entries[0]?.isIntersecting ?? false),
       { threshold: 0 },
     );
-    obs.observe(el);
-    return () => obs.disconnect();
+    observer.observe(element);
+    return () => observer.disconnect();
   }, []);
 
   return (
-    <div ref={wrap} style={{ position: "absolute", inset: 0 }}>
+    <div ref={wrap} className="absolute inset-0" aria-hidden="true">
       <Canvas
         frameloop={visible ? "always" : "never"}
-        camera={{ position: [0, 0, 5.6], fov: 45 }}
+        camera={{ position: [0, 0, 5.8], fov: 45 }}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-        dpr={[1, 2]}
-        aria-hidden="true"
+        dpr={[1, 1.75]}
+        style={{ touchAction: "none" }}
       >
-        <KidneyBlob />
-        <Particles />
+        <Scene />
       </Canvas>
     </div>
   );
