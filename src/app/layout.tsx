@@ -40,6 +40,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Overview
               </Link>
               <Link
+                href="/imaging"
+                className="rounded-[var(--radius-base)] px-2 py-1.5 text-muted transition-colors hover:bg-bg hover:text-text sm:px-3"
+              >
+                Imaging
+              </Link>
+              <Link
                 href="/records"
                 className="rounded-[var(--radius-base)] px-2 py-1.5 text-muted transition-colors hover:bg-bg hover:text-text sm:px-3"
               >
