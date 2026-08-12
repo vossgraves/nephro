@@ -1,34 +1,30 @@
 import HeroContent from "@/components/hero/HeroContent";
-import HeroScene from "@/components/hero/HeroScene";
+import HeroVideo from "@/components/hero/HeroVideo";
 import type { HeroStat } from "@/components/hero/HeroStats";
 
-// The message, metrics, and actions render on the server. WebGL enriches the experience
-// but never gates readability or access to the calculator.
+// The clinical narrative, metrics, and calculator access are always server-rendered.
+// Video enriches the page but never gates content or the primary action.
 export default function Hero({ stats }: { stats: readonly HeroStat[] }) {
   return (
-    <section className="relative isolate overflow-hidden bg-[#07151c] text-white">
+    <section className="relative isolate overflow-hidden border-y border-slate-200/80 bg-[#fbfbfa] text-slate-950">
+      <HeroVideo />
       <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(900px 680px at 76% 44%, rgba(14, 148, 144, 0.25), transparent 62%), radial-gradient(800px 600px at 18% -10%, rgba(8, 145, 178, 0.18), transparent 62%), linear-gradient(135deg, #07151c 0%, #09272b 54%, #06161d 100%)",
-        }}
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(251,251,250,0.98)_0%,rgba(251,251,250,0.94)_33%,rgba(251,251,250,0.58)_52%,rgba(251,251,250,0.16)_76%,rgba(251,251,250,0.26)_100%)] md:bg-[linear-gradient(90deg,rgba(251,251,250,0.99)_0%,rgba(251,251,250,0.96)_36%,rgba(251,251,250,0.64)_52%,rgba(251,251,250,0.14)_75%,rgba(251,251,250,0.34)_100%)]"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute inset-0 opacity-50"
+        className="pointer-events-none absolute inset-0 opacity-70"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(148, 233, 240, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 233, 240, 0.045) 1px, transparent 1px)",
-          backgroundSize: "42px 42px",
-          maskImage: "radial-gradient(ellipse at center, black, transparent 76%)",
+            "linear-gradient(rgba(15,23,42,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.035) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+          maskImage: "linear-gradient(90deg, black 0%, black 40%, transparent 78%)",
         }}
         aria-hidden="true"
       />
-      <HeroScene />
       <HeroContent stats={stats} />
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#07151c] via-[#07151c]/70 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#fbfbfa] to-transparent"
         aria-hidden="true"
       />
     </section>

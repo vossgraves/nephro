@@ -66,9 +66,9 @@ export function HeroStats({ stats }: { stats: readonly HeroStat[] }) {
         return (
           <div
             key={stat.label}
-            className="hero-pop min-w-0 rounded-[var(--radius-base)] border border-white/10 bg-white/[0.07] px-2 py-4 shadow-[0_18px_45px_-28px_rgba(103,232,249,0.75)] backdrop-blur-sm sm:px-3"
+            className="hero-pop min-w-0 rounded-[var(--radius-base)] border border-slate-200 bg-white/80 px-2 py-4 shadow-[0_18px_45px_-32px_rgba(15,23,42,0.45)] backdrop-blur-sm sm:px-3"
           >
-            <dd className="text-lg font-semibold tabular-nums text-white sm:text-xl">
+            <dd className="text-lg font-semibold tabular-nums text-slate-950 sm:text-xl">
               {numeric ? (
                 <span data-to={stat.value} data-digits={digits}>
                   {formatted}
@@ -77,11 +77,11 @@ export function HeroStats({ stats }: { stats: readonly HeroStat[] }) {
                 formatted
               )}
             </dd>
-            <dt className="mt-1 truncate text-[10px] uppercase tracking-wider text-white/50 sm:text-[11px]">
+            <dt className="mt-1 truncate text-[10px] uppercase tracking-wider text-slate-500 sm:text-[11px]">
               {stat.label}
               <span className="sr-only"> in {stat.unit}</span>
             </dt>
-            <p className="mt-0.5 text-[10px] text-white/40" aria-hidden="true">
+            <p className="mt-0.5 text-[10px] text-slate-400" aria-hidden="true">
               {stat.unit}
             </p>
           </div>

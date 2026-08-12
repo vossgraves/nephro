@@ -245,7 +245,7 @@ export default function LandingPage() {
             href="/calculator"
             className="rounded-[var(--radius-base)] bg-primary px-7 py-3 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
           >
-            Go to calculator
+            Open calculator
           </Link>
           <Link
             href="/records"
