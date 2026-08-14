@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
-const ALLOWED_MODALITIES = new Set<ImagingModality>(["xray", "ultrasound", "ct-export", "mri-export", "other"]);
+const ALLOWED_MODALITIES = new Set<ImagingModality>(["xray", "chest-xray", "ultrasound", "ct-kub", "ct-abdomen", "ct-chest", "mri-brain", "other"]);
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const headers = new Headers(init?.headers);
