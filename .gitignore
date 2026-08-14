@@ -9,3 +9,8 @@ dist
 .codex/
 .agents/
 
+
+# e2e artifacts
+shots-*.png
+diag-out.txt
+hist-out.txt
