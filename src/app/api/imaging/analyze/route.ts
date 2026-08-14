@@ -12,6 +12,53 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Carries both provider failures so the response can explain what happened. */
+class CompositeProviderError extends Error {
+  constructor(public gemini: Error, public openai: Error) {
+    super(`BOTH_PROVIDERS_FAILED gemini=${gemini.message} openai=${openai.message}`);
+    this.name = "CompositeProviderError";
+  }
+}
+
+function providerStatusFromCode(code: string): string {
+  if (code === "401" || code === "403") return "authentication";
+  if (code === "404") return "model";
+  if (code === "429") return "rate";
+  if (code.startsWith("5")) return "transient";
+  return "unknown";
+}
+
+function explainBothProvidersFailed(error: Error): { error: string; code: string; providerDetails: string[] } {
+  if (!(error instanceof CompositeProviderError)) {
+    return { error: "Both providers failed. Try again later.", code: "BOTH_PROVIDERS_FAILED", providerDetails: [] };
+  }
+  const details: string[] = [];
+  let transient = false;
+  let auth = false;
+  for (const [label, providerError] of [
+    ["gemini", error.gemini],
+    ["openai", error.openai],
+  ] as const) {
+    const status = providerError.message.includes(":") ? providerError.message.split(":")[1] : "";
+    const kind = providerStatusFromCode(status);
+    const kindLabel =
+      kind === "authentication" ? "API key rejected (check the configured key)"
+      : kind === "model" ? "model unavailable (check the model name)"
+      : kind === "rate" ? "rate limited"
+      : kind === "transient" ? "temporarily unavailable"
+      : "unavailable";
+    if (kind === "transient") transient = true;
+    if (kind === "authentication") auth = true;
+    details.push(`${label}: ${kindLabel}`);
+  }
+  const message = auth
+    ? "Provider API keys are being rejected. Check the GEMINI_API_KEY and OPENAI_API_KEY environment variables in Vercel."
+    : transient
+      ? "AI providers are temporarily unavailable. Wait a few seconds and try again."
+      : "Both providers failed. Try again later.";
+  return { error: message, code: "BOTH_PROVIDERS_FAILED", providerDetails: details };
+}
+
 const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const ALLOWED_MODALITIES = new Set<ImagingModality>(["xray", "chest-xray", "ultrasound", "ct-kub", "ct-abdomen", "ct-chest", "mri-brain", "other"]);
 
@@ -173,7 +220,14 @@ export async function POST(request: Request) {
       if (process.env.OPENAI_API_KEY) {
         payload.provider = "openai";
         usedProvider = "openai";
-        report = await analyzeWithOpenAI(payload);
+        try {
+          report = await analyzeWithOpenAI(payload);
+        } catch (openaiError) {
+          throw new CompositeProviderError(
+            geminiError instanceof Error ? geminiError : new Error(String(geminiError)),
+            openaiError instanceof Error ? openaiError : new Error(String(openaiError)),
+          );
+        }
       } else {
         throw new Error("NO_PROVIDERS_CONFIGURED");
       }
@@ -200,6 +254,9 @@ export async function POST(request: Request) {
       }, { status: 503 });
     }
     console.error("Imaging review request failed", { code: message.split(":")[0], detail: message });
+    if (message.startsWith("BOTH_PROVIDERS_FAILED")) {
+      return noStoreJson(explainBothProvidersFailed(error instanceof Error ? error : new Error(message)), { status: 503 });
+    }
     return noStoreJson({ error: message.includes("REQUEST_FAILED") ? "Both providers failed. Try again later." : message }, { status: 422 });
   }
 }
