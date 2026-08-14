@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import SiteNav from "@/components/SiteNav";
 import SplashGate from "@/components/SplashGate";
+import { SimpleModeToggle } from "@/components/SimpleModeToggle";
 import "./globals.css";
 
 const geist = Geist({
@@ -52,12 +53,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span className="hidden sm:inline">Renal Function</span>
                 <span className="sm:hidden">Nephro</span>
               </Link>
-              <div className="ml-auto hidden sm:block">
+              <div className="ml-auto hidden items-center gap-2 sm:flex">
                 <SiteNav />
+                <SimpleModeToggle />
               </div>
             </div>
-            <div className="mt-2 sm:hidden">
-              <SiteNav />
+            <div className="mt-2 flex items-center gap-2 sm:hidden">
+              <div className="min-w-0 flex-1">
+                <SiteNav />
+              </div>
+              <SimpleModeToggle />
             </div>
           </div>
         </header>

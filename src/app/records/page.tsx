@@ -1,21 +1,60 @@
 import Link from "next/link";
-import { isDbConfigured, listRecords } from "@/lib/db";
+import { isDbConfigured, listRecords, type RecordRow } from "@/lib/db";
 import { removeRecord } from "./actions";
+
+function exportCsv(records: RecordRow[]) {
+  const header = ["patient", "age", "sex", "egfr", "gfr_stage", "alb_stage", "kdigo_risk", "kfre_2yr", "kfre_5yr", "crcl", "created_at"];
+  const lines = records.map((r) =>
+    [
+      `"${r.patient_name.replace(/"/g, '""')}"`,
+      r.age,
+      r.sex,
+      r.egfr.toFixed(1),
+      r.gfr_stage,
+      r.alb_stage,
+      r.kdigo_risk,
+      r.kfre_2yr !== null ? (r.kfre_2yr * 100).toFixed(1) : "",
+      r.kfre_5yr !== null ? (r.kfre_5yr * 100).toFixed(1) : "",
+      r.crcl !== null ? r.crcl.toFixed(1) : "",
+      new Date(r.created_at).toISOString(),
+    ].join(","),
+  );
+  return [header.join(","), ...lines].join("\n");
+}
 
 export default async function RecordsPage() {
   const records = await listRecords();
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Patient records</h1>
-        <p className="mt-1 text-sm text-muted">
-          Saved assessments from the calculator, stored in Neon (Postgres).{" "}
-          <Link href="/calculator" className="text-primary underline underline-offset-2">
-            Run an assessment
-          </Link>
-          .
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Patient records</h1>
+          <p className="mt-1 text-sm text-muted">
+            Saved assessments from the calculator, stored in Neon (Postgres).{" "}
+            <Link href="/calculator" className="text-primary underline underline-offset-2">
+              Run an assessment
+            </Link>
+            .
+          </p>
+        </div>
+        {records.length > 0 ? (
+          <button
+            type="button"
+            className="pressable rounded-[calc(var(--radius-base)-2px)] border border-border bg-bg/60 px-3 py-2 text-xs font-semibold transition-colors hover:border-accent"
+            onClick={() => {
+              const blob = new Blob([exportCsv(records)], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `nephro-records-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Export CSV ({records.length})
+          </button>
+        ) : null}
       </div>
 
       {!isDbConfigured() ? (

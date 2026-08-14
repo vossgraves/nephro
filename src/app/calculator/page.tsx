@@ -55,6 +55,28 @@ function Stat({
   );
 }
 
+type SavedCalc = {
+  id: string;
+  savedAt: number;
+  name: string;
+  inputs: { name: string; sex: string; age: string; weight: string; scr: string; scrUnit: string; acr: string; acrUnit: string; region: string };
+  results: { egfr: number; crcl: number; stage: string; risk: string; kfre2: number | null; kfre5: number | null };
+};
+
+const HISTORY_KEY = "nephro.calc.history";
+const FAVES_KEY = "nephro.calc.favorites";
+const HISTORY_LIMIT = 15;
+
+function loadJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function CalculatorPage() {
   const [name, setName] = useState("");
   const [sex, setSex] = useState<"male" | "female">("female");
@@ -69,6 +91,91 @@ export default function CalculatorPage() {
   const [urineOut, setUrineOut] = useState("");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<SavedCalc[]>(() => loadJson<SavedCalc[]>(HISTORY_KEY, []));
+  const [favorites, setFavorites] = useState<SavedCalc[]>(() => loadJson<SavedCalc[]>(FAVES_KEY, []));
+  const [toast, setToast] = useState<string | null>(null);
+
+  const persistHistory = (items: SavedCalc[]) => {
+    setHistory(items);
+    try {
+      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, HISTORY_LIMIT)));
+    } catch {
+      // storage full or blocked — history simply does not persist
+    }
+  };
+
+  const persistFavorites = (items: SavedCalc[]) => {
+    setFavorites(items);
+    try {
+      window.localStorage.setItem(FAVES_KEY, JSON.stringify(items));
+    } catch {
+      // storage full or blocked — favorites simply do not persist
+    }
+  };
+
+  const rememberCurrent = () => {
+    if (!r) return;
+    const entry: SavedCalc = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      savedAt: Date.now(),
+      name: name || "Unnamed patient",
+      inputs: { name, sex, age, weight, scr, scrUnit, acr, acrUnit, region },
+      results: {
+        egfr: r.egfr,
+        crcl: r.crcl,
+        stage: `${r.g}${r.a}`,
+        risk: RISK_LABEL[r.risk],
+        kfre2: r.kf ? r.kf.risk2yr : null,
+        kfre5: r.kf ? r.kf.risk5yr : null,
+      },
+    };
+    persistHistory([entry, ...history]);
+    setToast("Saved to this browser's calculation history.");
+    window.setTimeout(() => setToast(null), 2200);
+  };
+
+  const toggleFavorite = () => {
+    if (!r) return;
+    const existing = favorites.find((f) => f.inputs.scr === scr && f.inputs.acr === acr && f.inputs.age === age && f.inputs.sex === sex);
+    if (existing) {
+      persistFavorites(favorites.filter((f) => f.id !== existing.id));
+      setToast("Removed from favorites.");
+    } else {
+      const entry: SavedCalc = {
+        id: `fav-${Date.now()}`,
+        savedAt: Date.now(),
+        name: name || "Unnamed patient",
+        inputs: { name, sex, age, weight, scr, scrUnit, acr, acrUnit, region },
+        results: {
+          egfr: r.egfr,
+          crcl: r.crcl,
+          stage: `${r.g}${r.a}`,
+          risk: RISK_LABEL[r.risk],
+          kfre2: r.kf ? r.kf.risk2yr : null,
+          kfre5: r.kf ? r.kf.risk5yr : null,
+        },
+      };
+      persistFavorites([entry, ...favorites]);
+      setToast("Added to favorites.");
+    }
+    window.setTimeout(() => setToast(null), 2200);
+  };
+
+  const restoreInputs = (entry: SavedCalc) => {
+    setName(entry.inputs.name);
+    setSex(entry.inputs.sex as "male" | "female");
+    setAge(entry.inputs.age);
+    setWeight(entry.inputs.weight);
+    setScr(entry.inputs.scr);
+    setScrUnit(entry.inputs.scrUnit as ScrUnit);
+    setAcr(entry.inputs.acr);
+    setAcrUnit(entry.inputs.acrUnit as AcrUnit);
+    setRegion(entry.inputs.region as Region);
+  };
+
+  const isCurrentFavorite = favorites.some(
+    (f) => f.inputs.scr === scr && f.inputs.acr === acr && f.inputs.age === age && f.inputs.sex === sex,
+  );
 
   /**
    * Validation runs before any equation. An out-of-range creatinine (usually the
@@ -384,6 +491,28 @@ export default function CalculatorPage() {
               </p>
             ) : (
               <div className="space-y-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={rememberCurrent}
+                    className="pressable rounded-[calc(var(--radius-base)-2px)] border border-border bg-bg/60 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-accent"
+                  >
+                    Save to history
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleFavorite}
+                    aria-pressed={isCurrentFavorite}
+                    className={`pressable rounded-[calc(var(--radius-base)-2px)] border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      isCurrentFavorite
+                        ? "border-accent bg-accent-soft text-accent-strong"
+                        : "border-border bg-bg/60 hover:border-accent"
+                    }`}
+                  >
+                    {isCurrentFavorite ? "★ In favorites" : "☆ Favorite"}
+                  </button>
+                  {toast ? <span className="text-xs text-muted" role="status">{toast}</span> : null}
+                </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Stat
                     label="eGFR (CKD-EPI 2021)"
@@ -465,6 +594,56 @@ export default function CalculatorPage() {
               </div>
             )}
           </Card>
+
+          {(history.length > 0 || favorites.length > 0) && (
+            <Card
+              title="Saved calculations"
+              description="Stored only in this browser (localStorage) — nothing is sent anywhere."
+            >
+              {favorites.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+                    Favorites
+                  </h3>
+                  <ul className="space-y-2">
+                    {favorites.map((entry) => (
+                      <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[calc(var(--radius-base)-2px)] border border-border bg-bg/50 px-3 py-2 text-sm">
+                        <button type="button" onClick={() => restoreInputs(entry)} className="text-left font-medium hover:text-accent">
+                          {entry.name}
+                          <span className="ml-2 font-normal tabular-nums text-muted">
+                            eGFR {entry.results.egfr.toFixed(1)} · {entry.results.stage} · {entry.results.risk}
+                          </span>
+                        </button>
+                        <span className="text-xs tabular-nums text-muted">
+                          {new Date(entry.savedAt).toLocaleDateString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+                  History
+                </h3>
+                <ul className="space-y-2">
+                  {history.map((entry) => (
+                    <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[calc(var(--radius-base)-2px)] border border-border bg-bg/50 px-3 py-2 text-sm">
+                      <button type="button" onClick={() => restoreInputs(entry)} className="text-left font-medium hover:text-accent">
+                        {entry.name}
+                        <span className="ml-2 font-normal tabular-nums text-muted">
+                          eGFR {entry.results.egfr.toFixed(1)} · {entry.results.stage} · {entry.results.risk}
+                        </span>
+                      </button>
+                      <span className="text-xs tabular-nums text-muted">
+                        {new Date(entry.savedAt).toLocaleDateString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

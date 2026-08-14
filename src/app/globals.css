@@ -289,6 +289,39 @@ input[type="range"]::-moz-range-track {
   }
 }
 
+/* ---------- Simple mode ---------- */
+
+html.simple-mode {
+  font-size: 118%;
+}
+
+html.simple-mode body {
+  letter-spacing: 0.01em;
+}
+
+html.simple-mode :is(p, li, span, label) {
+  line-height: 1.7;
+}
+
+html.simple-mode .hero-reveal {
+  animation: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+html.simple-mode .pressable {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+html.simple-mode .pressable:active {
+  transform: none;
+}
+
+html.simple-mode :focus-visible {
+  outline-width: 3px;
+  outline-offset: 4px;
+}
+
 @media print {
   .no-print {
     display: none !important;
