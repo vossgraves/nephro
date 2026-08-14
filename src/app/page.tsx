@@ -149,18 +149,18 @@ export default function LandingPage() {
                 Nephro turns a small set of clinical values into a citeable assessment. The route
                 from input to guidance is visible at every step.
               </p>
-              <Link
-                href="/methods"
-                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-accent"
-              >
+            <Link
+              href="/methods"
+              className="pressable mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-accent"
+            >
                 Inspect the published methods
                 <span aria-hidden="true">→</span>
               </Link>
             </div>
             <div className="space-y-3">
-              <div className="relative min-h-48 overflow-hidden rounded-[calc(var(--radius-base)+5px)] border border-slate-200 bg-[radial-gradient(circle_at_50%_42%,#f3fbfb_0%,#edf4f4_42%,#e7eded_100%)] shadow-[var(--shadow-card)]">
+              <div className="relative min-h-48 overflow-hidden rounded-[calc(var(--radius-base)+5px)] border border-slate-200 bg-[radial-gradient(circle_at_50%_42%,#fdf3e9_0%,#f9ead9_42%,#f3e3d2_100%)] shadow-[var(--shadow-card)]">
                 <HeroScene className="absolute inset-0 opacity-90" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#e7eded] to-transparent" aria-hidden="true" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f3e3d2] to-transparent" aria-hidden="true" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 p-4">
                   <div>
                     <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Interactive signal field</p>
@@ -204,7 +204,7 @@ export default function LandingPage() {
             </p>
             <Link
               href="/methods"
-              className="mt-6 inline-block rounded-[var(--radius-base)] bg-primary px-5 py-2.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
+              className="pressable mt-6 inline-block rounded-[var(--radius-base)] bg-primary px-5 py-2.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
             >
               Read the methods
             </Link>
@@ -257,13 +257,13 @@ export default function LandingPage() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/calculator"
-            className="rounded-[var(--radius-base)] bg-primary px-7 py-3 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
+            className="pressable rounded-[var(--radius-base)] bg-primary px-7 py-3 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
           >
             Open calculator
           </Link>
           <Link
             href="/records"
-            className="rounded-[var(--radius-base)] border border-border bg-surface px-7 py-3 text-sm font-semibold transition-colors hover:bg-bg"
+            className="pressable rounded-[var(--radius-base)] border border-border bg-surface px-7 py-3 text-sm font-semibold transition-colors hover:bg-bg"
           >
             View patient records
           </Link>

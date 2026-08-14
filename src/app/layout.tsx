@@ -1,7 +1,21 @@
 import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import SiteNav from "@/components/SiteNav";
+import SplashGate from "@/components/SplashGate";
 import "./globals.css";
+
+const geist = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Renal Function Calculator | Validated CKD Assessment",
@@ -15,8 +29,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body className="min-h-dvh flex flex-col">
+        <SplashGate />
         <header className="no-print sticky top-0 z-40 border-b border-border/80 bg-surface/80 backdrop-blur-xl">
           <div className="mx-auto max-w-6xl px-4 py-3 sm:flex sm:items-center sm:gap-6 sm:px-6">
             <div className="flex items-center">

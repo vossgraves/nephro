@@ -4,14 +4,14 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-const TEAL = new THREE.Color("#2f7e92");
-const GREEN = new THREE.Color("#6ba7a2");
-const RIM = new THREE.Color("#e2f3f5");
+const TEAL = new THREE.Color("#a8441c");
+const GREEN = new THREE.Color("#d97b45");
+const RIM = new THREE.Color("#fbe3cd");
 
 const SIGNALS = [
-  { color: "#4f9bb0", phase: 0.2 },
-  { color: "#71999a", phase: 2.28 },
-  { color: "#95b9bd", phase: 4.36 },
+  { color: "#cf7a44", phase: 0.2 },
+  { color: "#d99c6d", phase: 2.28 },
+  { color: "#e8c49a", phase: 4.36 },
 ] as const;
 
 const VERTEX = /* glsl */ `
@@ -233,11 +233,11 @@ function OrbitSystem({ reduced }: { reduced: boolean }) {
     <group ref={orbit} rotation={[0.78, 0.18, -0.34]}>
       <mesh>
         <torusGeometry args={[3.05, 0.014, 8, 160]} />
-        <meshBasicMaterial color="#67e8f9" transparent opacity={0.42} />
+        <meshBasicMaterial color="#e8965c" transparent opacity={0.42} />
       </mesh>
       <mesh rotation={[Math.PI / 2.65, 0, 0]} scale={[1, 0.64, 1]}>
         <torusGeometry args={[3.05, 0.009, 8, 160]} />
-        <meshBasicMaterial color="#6ee7b7" transparent opacity={0.24} />
+        <meshBasicMaterial color="#ddb183" transparent opacity={0.24} />
       </mesh>
       {SIGNALS.map((signal) => (
         <SignalNode key={signal.phase} {...signal} reduced={reduced} />

@@ -18,6 +18,7 @@ import {
   RecognitionProvider,
   RecognitionReport,
 } from "@/lib/imaging-recognition";
+import { KidneyLoader } from "@/components/KidneyLoader";
 
 type Sample = { x: number; y: number; value: string } | null;
 type ImageInfo = { width: number; height: number; luminance: number; source: string };
@@ -27,6 +28,12 @@ type Breakpoint = "phone" | "tablet" | "desktop";
 const MAX_LOCAL_FILE_BYTES = 25 * 1024 * 1024;
 const ACCEPTED = new Set(["image/png", "image/jpeg", "image/webp"]);
 const modalities = Object.keys(modalityLabel) as ImagingModality[];
+
+const ANALYSIS_PHASES = [
+  "Contacting provider",
+  "Reading image",
+  "Assembling report",
+] as const;
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -64,7 +71,7 @@ function Icon({ name, className = "size-4" }: { name: "upload" | "zoomIn" | "zoo
 
 function List({ items, empty }: { items: string[]; empty: string }) {
   if (!items.length) return <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>{empty}</p>;
-  return <ul className="space-y-2 text-sm leading-relaxed" style={{ color: "var(--text)" }}>{items.map((item, index) => <li className="flex gap-2" key={`${item}-${index}`}><span className="mt-2 size-1.5 shrink-0 rounded-full" style={{ background: "var(--primary)" }} />{item}</li>)}</ul>;
+  return <ul className="space-y-2 text-sm leading-relaxed" style={{ color: "var(--text)" }}>{items.map((item, index) => <li className="flex gap-2" key={`${item}-${index}`}><span className="mt-2 size-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />{item}</li>)}</ul>;
 }
 
 export default function ImagingWorkspace() {
@@ -94,6 +101,7 @@ export default function ImagingWorkspace() {
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [report, setReport] = useState<RecognitionReport | null>(null);
+  const [phaseIndex, setPhaseIndex] = useState(0);
 
   const resetView = useCallback(() => {
     setBrightness(100);
@@ -128,6 +136,15 @@ export default function ImagingWorkspace() {
   useEffect(() => () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   }, [sourceUrl]);
+
+  useEffect(() => {
+    if (analysisState !== "loading") return;
+    setPhaseIndex(0);
+    const timer = window.setInterval(() => {
+      setPhaseIndex((index) => (index + 1) % ANALYSIS_PHASES.length);
+    }, 950);
+    return () => window.clearInterval(timer);
+  }, [analysisState]);
 
   const loadFile = useCallback((candidate: File | undefined) => {
     if (!candidate) return;
@@ -202,7 +219,7 @@ export default function ImagingWorkspace() {
     if (!context) return;
     context.save();
     context.scale(ratio, ratio);
-    context.fillStyle = "#0f1115";
+    context.fillStyle = "#131518";
     context.fillRect(0, 0, bounds.width, bounds.height);
     if (!image) { context.restore(); return; }
     const baseScale = Math.min(bounds.width / image.naturalWidth, bounds.height / image.naturalHeight);
@@ -302,26 +319,31 @@ export default function ImagingWorkspace() {
   const isTablet = breakpoint === "tablet";
   const isMobile = isPhone || isTablet;
   const viewerHeight = isPhone ? "220px" : isTablet ? "280px" : "340px";
-  const pagePad = isPhone ? "1.5rem" : isTablet ? "2.5rem" : "2rem";
+  const pagePad = isPhone ? "1.25rem" : isTablet ? "2rem" : "2rem";
   const h1Size = isPhone ? "28px" : isTablet ? "38px" : "48px";
+  const cardRadius = "calc(var(--radius-base) + 4px)";
+  const controlRadius = "calc(var(--radius-base) - 6px)";
+
+  const accent = "var(--accent)";
+  const accentMuted = (alpha: number) => `color-mix(in oklab, var(--accent) ${alpha}%, transparent)`;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-body)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-sans)" }}>
       {/* Header Section */}
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad} ${pagePad} 0` }}>
         <div style={{ marginBottom: isMobile ? "2rem" : "3rem" }}>
-          <h6 style={{ color: "#c67139", fontSize: "12px", fontWeight: "600", letterSpacing: "0.2em", marginBottom: "0.5rem", textTransform: "uppercase" }}>Imaging review workspace</h6>
-          <h1 style={{ fontSize: h1Size, fontWeight: "bold", marginBottom: "1.5rem", maxWidth: "640px", lineHeight: 1.2 }}>Real visual review, not simulated diagnosis.</h1>
+          <h6 style={{ color: accent, fontSize: "12px", fontWeight: "600", letterSpacing: "0.2em", marginBottom: "0.5rem", textTransform: "uppercase" }}>Imaging review workspace</h6>
+          <h1 style={{ fontSize: h1Size, fontWeight: "bold", marginBottom: "1.5rem", maxWidth: "640px", lineHeight: 1.2, letterSpacing: "-0.02em" }}>Real visual review, not simulated diagnosis.</h1>
           <p style={{ fontSize: "15px", opacity: 0.85, maxWidth: "600px", lineHeight: 1.6, marginBottom: isMobile ? "1.5rem" : "2rem" }}>
             Review exported, de-identified medical images locally, then optionally request an <strong>AI-assisted visual review</strong> from a configured OpenAI or Gemini provider. The report preserves uncertainty and never substitutes for clinical interpretation.
           </p>
         </div>
 
         {/* Clinical Boundary Warning */}
-        <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", borderRadius: "12px", backgroundColor: "#c6713920", padding: "1.5rem", marginBottom: isMobile ? "2rem" : "3rem" }}>
-          <span style={{ color: "#c67139", flexShrink: 0, marginTop: "2px" }}><Icon name="warning" className="size-5" /></span>
+        <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", borderRadius: cardRadius, backgroundColor: accentMuted(8), padding: "1.5rem", marginBottom: isMobile ? "2rem" : "3rem" }}>
+          <span style={{ color: accent, flexShrink: 0, marginTop: "2px" }}><Icon name="warning" className="size-5" /></span>
           <div>
-            <strong style={{ fontSize: "13px", color: "#c67139" }}>Clinical boundary.</strong>
+            <strong style={{ fontSize: "13px", color: accent }}>Clinical boundary.</strong>
             <span style={{ fontSize: "13px", opacity: 0.85, display: "block", marginTop: "0.25rem" }}>Do not upload identifiable patient images. This is not a medical device, radiology report, or treatment recommendation.</span>
           </div>
         </div>
@@ -331,25 +353,25 @@ export default function ImagingWorkspace() {
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `0 ${pagePad} ${pagePad}`, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "2rem", alignItems: "start" }}>
 
         {/* Image Viewer Card */}
-        <div style={{ borderRadius: "16px", border: "1px solid var(--border)", backgroundColor: "var(--surface)", overflow: "hidden" }}>
+        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
           {/* Viewer Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderBottom: "1px solid var(--border)", backgroundColor: "rgba(255,255,255,0.5)", padding: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderBottom: "1px solid var(--border)", backgroundColor: "var(--surface-raised)", padding: "1rem" }}>
             <div style={{ minWidth: 0 }}>
               <p style={{ fontSize: "14px", fontWeight: "600", margin: 0, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file?.name ?? "No image selected"}</p>
-              <p style={{ fontSize: "12px", opacity: 0.6, margin: "0.5rem 0 0", fontFamily: "monospace" }}>
+              <p style={{ fontSize: "12px", opacity: 0.6, margin: "0.5rem 0 0", fontFamily: "var(--font-mono)" }}>
                 {file ? `${formatBytes(file.size)} · ${imagePropertyLabel}` : "PNG · JPEG · WebP · up to 25 MB"}
               </p>
             </div>
             <div style={{ display: "flex", gap: "0.5rem" }}>
-              <button type="button" onClick={() => setZoom((value) => Math.min(3, +(value + 0.2).toFixed(1)))} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)" }} aria-label="Zoom in"><Icon name="zoomIn" className="size-4" /></button>
-              <button type="button" onClick={() => setZoom((value) => Math.max(0.6, +(value - 0.2).toFixed(1)))} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)" }} aria-label="Zoom out"><Icon name="zoomOut" className="size-4" /></button>
-              <button type="button" onClick={resetView} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)" }} aria-label="Reset"><Icon name="reset" className="size-4" /></button>
+              <button type="button" onClick={() => setZoom((value) => Math.min(3, +(value + 0.2).toFixed(1)))} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)", transition: "background-color 140ms ease, border-color 140ms ease" }} className="pressable" aria-label="Zoom in"><Icon name="zoomIn" className="size-4" /></button>
+              <button type="button" onClick={() => setZoom((value) => Math.max(0.6, +(value - 0.2).toFixed(1)))} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)", transition: "background-color 140ms ease, border-color 140ms ease" }} className="pressable" aria-label="Zoom out"><Icon name="zoomOut" className="size-4" /></button>
+              <button type="button" onClick={resetView} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)", transition: "background-color 140ms ease, border-color 140ms ease" }} className="pressable" aria-label="Reset view"><Icon name="reset" className="size-4" /></button>
             </div>
           </div>
 
           {/* Canvas */}
-          <div style={{ position: "relative", backgroundColor: "#1a1a1a", padding: "1rem", aspectRatio: "4/3" }}>
-            <canvas ref={canvasRef} style={{ width: "100%", height: "100%", borderRadius: "8px", display: "block", touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={() => !dragOrigin && setSample(null)} aria-label="Image viewer. Drag to pan; move pointer for pixel intensity." />
+          <div style={{ position: "relative", backgroundColor: "#131518", padding: "1rem", aspectRatio: "4/3" }}>
+            <canvas ref={canvasRef} style={{ width: "100%", height: "100%", borderRadius: "calc(var(--radius-base) - 4px)", display: "block", touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={() => !dragOrigin && setSample(null)} aria-label="Image viewer. Drag to pan; move pointer for pixel intensity." />
             {!sourceUrl && (
               <div style={{ position: "absolute", inset: "1rem", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
                 <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
@@ -365,10 +387,10 @@ export default function ImagingWorkspace() {
 
           {/* Footer with controls */}
           <div style={{ borderTop: "1px solid var(--border)", padding: "1rem", backgroundColor: "var(--surface)", display: "flex", flexDirection: isPhone ? "column" : "row", gap: "1rem", alignItems: isPhone ? "stretch" : "center", justifyContent: "space-between" }}>
-            <p style={{ fontSize: "11px", fontFamily: "monospace", opacity: 0.6, margin: 0 }}>
+            <p style={{ fontSize: "11px", fontFamily: "var(--font-mono)", opacity: 0.6, margin: 0 }}>
               {sample ? `x ${sample.x} · y ${sample.y} · luminance ${sample.value}` : "Hover for pixel intensity"}
             </p>
-            <button type="button" onClick={() => inputRef.current?.click()} style={{ padding: "0.5rem 1rem", backgroundColor: "#c67139", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center", minWidth: "140px" }}>
+            <button type="button" onClick={() => inputRef.current?.click()} className="pressable" style={{ padding: "0.5rem 1rem", backgroundColor: accent, color: "var(--accent-fg)", border: "none", borderRadius: controlRadius, fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center", minWidth: "140px", transition: "background-color 140ms ease" }}>
               <Icon name="upload" className="size-4" />{file ? "Replace" : "Choose image"}
             </button>
             <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event: ChangeEvent<HTMLInputElement>) => loadFile(event.target.files?.[0])} style={{ display: "none" }} />
@@ -376,34 +398,34 @@ export default function ImagingWorkspace() {
         </div>
 
         {/* Settings Card */}
-        <div style={{ borderRadius: "16px", border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isPhone ? "1.5rem" : "2rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxShadow: "var(--shadow-card)" }}>
           <div>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 1rem" }}>Local controls</h6>
+            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Local controls</h6>
 
             {/* Brightness */}
             <div style={{ marginBottom: "1.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "0.5rem" }}>
                 <span>Brightness</span>
-                <span style={{ opacity: 0.6, fontFamily: "monospace" }}>{brightness}%</span>
+                <span style={{ opacity: 0.6, fontFamily: "var(--font-mono)" }}>{brightness}%</span>
               </div>
-              <input type="range" min="20" max="200" value={brightness} onChange={(event) => setBrightness(+event.target.value)} style={{ width: "100%", height: "5px", borderRadius: "999px", outline: "none", cursor: "pointer", background: `linear-gradient(to right, #c67139 ${(brightness - 20) / 1.8}%, var(--border) ${(brightness - 20) / 1.8}%)` }} />
+              <input type="range" min="20" max="200" value={brightness} onChange={(event) => setBrightness(+event.target.value)} style={{ width: "100%", background: `linear-gradient(to right, ${accent} ${(brightness - 20) / 1.8}%, var(--border) ${(brightness - 20) / 1.8}%)` }} />
             </div>
 
             {/* Contrast */}
             <div style={{ marginBottom: "1.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "0.5rem" }}>
                 <span>Contrast</span>
-                <span style={{ opacity: 0.6, fontFamily: "monospace" }}>{contrast}%</span>
+                <span style={{ opacity: 0.6, fontFamily: "var(--font-mono)" }}>{contrast}%</span>
               </div>
-              <input type="range" min="20" max="200" value={contrast} onChange={(event) => setContrast(+event.target.value)} style={{ width: "100%", height: "5px", borderRadius: "999px", outline: "none", cursor: "pointer", background: `linear-gradient(to right, #c67139 ${(contrast - 20) / 1.8}%, var(--border) ${(contrast - 20) / 1.8}%)` }} />
+              <input type="range" min="20" max="200" value={contrast} onChange={(event) => setContrast(+event.target.value)} style={{ width: "100%", background: `linear-gradient(to right, ${accent} ${(contrast - 20) / 1.8}%, var(--border) ${(contrast - 20) / 1.8}%)` }} />
             </div>
 
             {/* Toggles */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              <button type="button" onClick={() => setInvert((value) => !value)} style={{ padding: "0.5rem", backgroundColor: invert ? "#c67139" : "transparent", color: invert ? "white" : "var(--text)", border: `1px solid ${invert ? "#c67139" : "var(--border)"}`, borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
+              <button type="button" onClick={() => setInvert((value) => !value)} className="pressable" style={{ padding: "0.5rem", backgroundColor: invert ? accent : "transparent", color: invert ? "var(--accent-fg)" : "var(--text)", border: `1px solid ${invert ? accent : "var(--border)"}`, borderRadius: controlRadius, fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center", transition: "background-color 140ms ease, border-color 140ms ease, color 140ms ease" }}>
                 <Icon name="invert" className="size-4" />Invert
               </button>
-              <button type="button" onClick={() => setGrid((value) => !value)} style={{ padding: "0.5rem", backgroundColor: grid ? "#c67139" : "transparent", color: grid ? "white" : "var(--text)", border: `1px solid ${grid ? "#c67139" : "var(--border)"}`, borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
+              <button type="button" onClick={() => setGrid((value) => !value)} className="pressable" style={{ padding: "0.5rem", backgroundColor: grid ? accent : "transparent", color: grid ? "var(--accent-fg)" : "var(--text)", border: `1px solid ${grid ? accent : "var(--border)"}`, borderRadius: controlRadius, fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center", transition: "background-color 140ms ease, border-color 140ms ease, color 140ms ease" }}>
                 <Icon name="grid" className="size-4" />Grid
               </button>
             </div>
@@ -411,10 +433,10 @@ export default function ImagingWorkspace() {
 
           {/* File Facts */}
           <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1.5rem" }}>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 1rem" }}>Local file facts</h6>
+            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Local file facts</h6>
             <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem 1rem", fontSize: "12px" }}>
-              <div><dt style={{ opacity: 0.6 }}>Dimensions</dt><dd style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "0.25rem" }}>{info ? imagePropertyLabel : "—"}</dd></div>
-              <div><dt style={{ opacity: 0.6 }}>Mean luminance</dt><dd style={{ fontFamily: "monospace", fontSize: "11px", marginTop: "0.25rem" }}>{info ? `${info.luminance} / 255` : "—"}</dd></div>
+              <div><dt style={{ opacity: 0.6 }}>Dimensions</dt><dd style={{ fontFamily: "var(--font-mono)", fontSize: "11px", marginTop: "0.25rem" }}>{info ? imagePropertyLabel : "—"}</dd></div>
+              <div><dt style={{ opacity: 0.6 }}>Mean luminance</dt><dd style={{ fontFamily: "var(--font-mono)", fontSize: "11px", marginTop: "0.25rem" }}>{info ? `${info.luminance} / 255` : "—"}</dd></div>
               <div><dt style={{ opacity: 0.6 }}>Storage</dt><dd style={{ fontSize: "11px", marginTop: "0.25rem" }}>This browser</dd></div>
               <div><dt style={{ opacity: 0.6 }}>Format</dt><dd style={{ fontSize: "11px", marginTop: "0.25rem" }}>{file?.type || "—"}</dd></div>
             </dl>
@@ -426,13 +448,13 @@ export default function ImagingWorkspace() {
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "2rem", alignItems: "start" }}>
 
         {/* AI Review Card */}
-        <div style={{ borderRadius: "16px", border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem" }}>
+        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
-              <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0" }}>AI-assisted visual review</h6>
-              <h2 style={{ fontSize: "22px", fontWeight: "bold", marginTop: "0.75rem", marginBottom: "0" }}>Powered analysis, not faked diagnosis.</h2>
+              <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0" }}>AI-assisted visual review</h6>
+              <h2 style={{ fontSize: "22px", fontWeight: "bold", marginTop: "0.75rem", marginBottom: "0", letterSpacing: "-0.02em" }}>Powered analysis, not faked diagnosis.</h2>
             </div>
-            <span style={{ display: "inline-block", backgroundColor: providerStatus === "ready" ? "rgba(198, 113, 57, 0.1)" : "rgba(245, 158, 11, 0.1)", color: providerStatus === "ready" ? "#c67139" : "#a16207", padding: "0.5rem 1rem", borderRadius: "999px", fontSize: "12px", fontWeight: "600", width: "fit-content" }}>
+            <span style={{ display: "inline-block", backgroundColor: providerStatus === "ready" ? accentMuted(10) : "rgba(245, 158, 11, 0.1)", color: providerStatus === "ready" ? accent : "#a16207", padding: "0.5rem 1rem", borderRadius: "999px", fontSize: "12px", fontWeight: "600", width: "fit-content" }}>
               {providerStatus === "ready" ? "Ready to analyze" : providerStatus === "checking" ? "Checking providers..." : "Providers unavailable"}
             </span>
           </div>
@@ -440,7 +462,7 @@ export default function ImagingWorkspace() {
           {/* Modality Selection */}
           <div style={{ marginBottom: "1.5rem" }}>
             <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "0.5rem" }} htmlFor="modality-select">Image modality</label>
-            <select id="modality-select" value={modality} onChange={(event) => setModality(event.target.value as ImagingModality)} style={{ width: "100%", padding: "0.75rem", border: "1px solid var(--border)", borderRadius: "6px", backgroundColor: "var(--bg)", color: "var(--text)", fontSize: "13px", fontFamily: "inherit", cursor: "pointer" }}>
+            <select id="modality-select" value={modality} onChange={(event) => setModality(event.target.value as ImagingModality)} style={{ width: "100%", padding: "0.75rem", border: "1px solid var(--border)", borderRadius: controlRadius, backgroundColor: "var(--surface-raised)", color: "var(--text)", fontSize: "13px", fontFamily: "inherit", cursor: "pointer", transition: "border-color 140ms ease" }}>
               {modalities.map((value) => <option value={value} key={value}>{modalityLabel[value]}</option>)}
             </select>
           </div>
@@ -448,25 +470,25 @@ export default function ImagingWorkspace() {
           {/* Clinical Question */}
           <div style={{ marginBottom: "1.5rem" }}>
             <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "0.5rem" }} htmlFor="question">Optional question</label>
-            <textarea id="question" value={clinicalQuestion} onChange={(event) => setClinicalQuestion(event.target.value)} maxLength={600} style={{ width: "100%", padding: "0.75rem", border: "1px solid var(--border)", borderRadius: "6px", backgroundColor: "var(--bg)", color: "var(--text)", fontSize: "13px", fontFamily: "inherit", minHeight: "80px", resize: "vertical" }} placeholder="e.g., Note any visible technical quality issues or anatomic boundaries..." />
+            <textarea id="question" value={clinicalQuestion} onChange={(event) => setClinicalQuestion(event.target.value)} maxLength={600} style={{ width: "100%", padding: "0.75rem", border: "1px solid var(--border)", borderRadius: controlRadius, backgroundColor: "var(--surface-raised)", color: "var(--text)", fontSize: "13px", fontFamily: "inherit", minHeight: "80px", resize: "vertical", transition: "border-color 140ms ease" }} placeholder="e.g., Note any visible technical quality issues or anatomic boundaries..." />
           </div>
 
           {/* Consent Checkbox */}
-          <label style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", padding: "1rem", backgroundColor: "rgba(0,0,0,0.02)", borderRadius: "8px", fontSize: "12px", lineHeight: 1.5, marginBottom: "1.5rem", cursor: "pointer" }}>
-            <input type="checkbox" checked={deidentifiedConfirmed} onChange={(event) => setDeidentifiedConfirmed(event.target.checked)} style={{ marginTop: "2px", cursor: "pointer", width: "16px", height: "16px" }} />
+          <label style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", padding: "1rem", backgroundColor: "var(--surface-inset)", borderRadius: controlRadius, fontSize: "12px", lineHeight: 1.5, marginBottom: "1.5rem", cursor: "pointer" }}>
+            <input type="checkbox" checked={deidentifiedConfirmed} onChange={(event) => setDeidentifiedConfirmed(event.target.checked)} style={{ marginTop: "2px", cursor: "pointer", width: "16px", height: "16px", accentColor: accent }} />
             <span>I confirm this is a de-identified exported image and consent to send it to configured AI providers for visual review. The image is not permanently stored by Nephro.</span>
           </label>
 
           {/* Alerts */}
-          {notice && <div style={{ padding: "0.75rem", backgroundColor: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "6px", fontSize: "12px", color: "#a16207", marginBottom: "1rem" }}>{notice}</div>}
-          {analysisError && <div style={{ padding: "0.75rem", backgroundColor: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "6px", fontSize: "12px", color: "#dc2626", marginBottom: "1rem" }} role="alert">{analysisError}</div>}
+          {notice && <div role="status" style={{ padding: "0.75rem", backgroundColor: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: controlRadius, fontSize: "12px", color: "#a16207", marginBottom: "1rem" }}>{notice}</div>}
+          {analysisError && <div role="alert" style={{ padding: "0.75rem", backgroundColor: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: controlRadius, fontSize: "12px", color: "#dc2626", marginBottom: "1rem" }}>{analysisError}</div>}
 
           {/* Submit Button */}
-          <button type="button" disabled={Boolean(analysisBlocked)} onClick={requestAnalysis} style={{ width: "100%", padding: "0.75rem", backgroundColor: analysisBlocked ? "rgba(198, 113, 57, 0.3)" : "#c67139", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", fontWeight: "600", cursor: analysisBlocked ? "not-allowed" : "pointer", opacity: analysisBlocked ? 0.5 : 1, display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
+          <button type="button" disabled={Boolean(analysisBlocked)} onClick={requestAnalysis} aria-busy={analysisState === "loading"} style={{ width: "100%", padding: "0.75rem", backgroundColor: analysisBlocked ? accentMuted(30) : accent, color: "var(--accent-fg)", border: "none", borderRadius: controlRadius, fontSize: "14px", fontWeight: "600", cursor: analysisBlocked ? "not-allowed" : "pointer", opacity: analysisBlocked ? 0.55 : 1, display: "flex", alignItems: "center", gap: "0.75rem", justifyContent: "center", transition: "background-color 160ms ease, opacity 160ms ease", minHeight: "46px" }}>
             {analysisState === "loading" ? (
               <>
-                <span style={{ width: "16px", height: "16px", border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-                Reviewing...
+                <KidneyLoader size={26} ariaLabel="Reviewing" />
+                <span className="tabular-nums">{ANALYSIS_PHASES[phaseIndex]}…</span>
               </>
             ) : (
               <>
@@ -480,12 +502,12 @@ export default function ImagingWorkspace() {
         </div>
 
         {/* Info Card */}
-        <div style={{ borderRadius: "16px", border: "1px solid var(--border)", backgroundColor: "rgba(0,0,0,0.02)", padding: "2rem" }}>
-          <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 1rem" }}>Capabilities</h6>
+        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface-inset)", padding: isPhone ? "1.5rem" : "2rem" }}>
+          <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Capabilities</h6>
           <p style={{ fontSize: "13px", opacity: 0.8, lineHeight: 1.6, marginBottom: "1.5rem" }}>
             The report can describe visible image characteristics, technical quality, and limitations. It cannot replace a radiologist, analyze full DICOM studies, or validate disease findings.
           </p>
-          <a href="https://www.cancerimagingarchive.net/access-data/" target="_blank" rel="noreferrer" style={{ fontSize: "13px", fontWeight: "600", color: "#c67139", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <a href="https://www.cancerimagingarchive.net/access-data/" target="_blank" rel="noreferrer" style={{ fontSize: "13px", fontWeight: "600", color: accent, textDecoration: "none", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             Explore de-identified teaching data <Icon name="arrow" className="size-4" />
           </a>
         </div>
@@ -494,22 +516,22 @@ export default function ImagingWorkspace() {
       {/* Report Output */}
       {report && (
         <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem" }} aria-live="polite">
-          <div style={{ borderRadius: "16px", border: "2px solid rgba(198, 113, 57, 0.3)", backgroundColor: "rgba(198, 113, 57, 0.05)", padding: isMobile ? "1.5rem" : "2rem" }}>
-            <div style={{ marginBottom: "1.5rem", paddingBottom: "1.5rem", borderBottom: "1px solid rgba(198, 113, 57, 0.2)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div style={{ borderRadius: cardRadius, border: "1px solid", borderColor: accentMuted(30), backgroundColor: accentMuted(4), padding: isMobile ? "1.5rem" : "2rem" }}>
+            <div style={{ marginBottom: "1.5rem", paddingBottom: "1.5rem", borderBottom: "1px solid", borderColor: accentMuted(20), display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ color: "#c67139" }}><Icon name="check" className="size-4" /></span>
-                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0" }}>Review complete</h6>
+                <span style={{ color: accent }}><Icon name="check" className="size-4" /></span>
+                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0" }}>Review complete</h6>
               </div>
-              <h2 style={{ fontSize: "22px", fontWeight: "bold", margin: "0.5rem 0 0" }}>Report output</h2>
+              <h2 style={{ fontSize: "22px", fontWeight: "bold", margin: "0.5rem 0 0", letterSpacing: "-0.02em" }}>Report output</h2>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "2rem", marginBottom: "1.5rem" }}>
               <div>
-                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 1rem" }}>Summary</h6>
+                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Summary</h6>
                 <p style={{ fontSize: "14px", lineHeight: 1.6, marginBottom: "1.5rem" }}>{report.summary}</p>
 
-                <div style={{ borderRadius: "10px", border: "1px solid var(--border)", backgroundColor: "rgba(255,255,255,0.5)", padding: "1rem" }}>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 0.75rem" }}>Image quality</h6>
+                <div style={{ borderRadius: "calc(var(--radius-base) - 2px)", border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: "1rem" }}>
+                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Image quality</h6>
                   <p style={{ fontSize: "13px", lineHeight: 1.5, marginBottom: "0.75rem" }}>{report.imageQuality.assessment}</p>
                   <List items={report.imageQuality.limitations} empty="No quality limitations noted." />
                 </div>
@@ -517,22 +539,22 @@ export default function ImagingWorkspace() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                 <div>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 0.75rem" }}>Directly visible features</h6>
+                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Directly visible features</h6>
                   <List items={report.observedVisualFeatures} empty="No specific features returned." />
                 </div>
                 <div>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 0.75rem" }}>Not assessable</h6>
+                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Not assessable</h6>
                   <List items={report.notAssessableFromThisImage} empty="No limitations noted." />
                 </div>
                 <div>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0 0 0.75rem" }}>For clinician review</h6>
+                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>For clinician review</h6>
                   <List items={report.clinicianQuestions} empty="No follow-up questions." />
                 </div>
               </div>
             </div>
 
             {/* Safety note */}
-            <div style={{ borderRadius: "10px", backgroundColor: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", padding: "1rem" }}>
+            <div style={{ borderRadius: "calc(var(--radius-base) - 2px)", backgroundColor: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", padding: "1rem" }}>
               <p style={{ fontSize: "13px", fontWeight: "600", color: "#a16207", margin: "0 0 0.5rem" }}>{report.safetyNote}</p>
               <p style={{ fontSize: "13px", lineHeight: 1.6, opacity: 0.85, margin: "0", color: "#a16207" }}>{report.uncertainty}</p>
             </div>
@@ -541,32 +563,6 @@ export default function ImagingWorkspace() {
           </div>
         </section>
       )}
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: #c67139;
-          border: 3px solid var(--bg);
-          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-          margin-top: -6px;
-        }
-        input[type="range"]::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: #c67139;
-          border: 3px solid var(--bg);
-          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-        }
-        input[type="range"]::-moz-range-track {
-          background: transparent;
-          border: none;
-        }
-      `}</style>
     </div>
   );
 }

@@ -3,3 +3,9 @@ node_modules
 .env
 dist
 *.tsbuildinfo
+
+# Local AI tool hook configs
+.claude/
+.codex/
+.agents/
+

@@ -1,18 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg: oklch(0.986 0.002 92);
+  --bg: oklch(0.986 0.003 90);
   --surface: oklch(1 0 0);
-  --surface-raised: oklch(0.997 0.002 92);
-  --surface-inset: oklch(0.974 0.004 250);
-  --border: oklch(0.892 0.007 250);
-  --border-strong: oklch(0.81 0.012 250);
-  --text: oklch(0.218 0.012 250);
-  --muted: oklch(0.49 0.012 250);
-  --primary: oklch(0.286 0.014 250);
+  --surface-raised: oklch(0.997 0.003 90);
+  --surface-inset: oklch(0.972 0.004 250);
+  --border: oklch(0.9 0.008 250);
+  --border-strong: oklch(0.8 0.014 250);
+  --text: oklch(0.22 0.012 250);
+  --muted: oklch(0.49 0.013 250);
+  --primary: oklch(0.26 0.016 250);
   --primary-fg: oklch(0.99 0 0);
-  --accent: oklch(0.5 0.088 202);
-  --accent-soft: oklch(0.94 0.025 202);
+  --accent: oklch(0.63 0.15 46);
+  --accent-strong: oklch(0.56 0.15 44);
+  --accent-soft: oklch(0.95 0.035 55);
+  --accent-fg: oklch(0.995 0 0);
   --low: oklch(0.78 0.04 150);
   --moderate: oklch(0.84 0.08 88);
   --high: oklch(0.72 0.12 56);
@@ -20,6 +22,7 @@
   --radius: 0.75rem;
   --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.035), 0 12px 28px rgba(15, 23, 42, 0.045);
   --shadow-float: 0 12px 34px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
 }
@@ -33,13 +36,15 @@
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
   --color-low: var(--low);
   --color-moderate: var(--moderate);
   --color-high: var(--high);
   --color-very-high: var(--very-high);
   --radius-base: var(--radius);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", "Cascadia Code", monospace;
 }
 
 html {
@@ -114,6 +119,160 @@ body {
   }
 }
 
+/* ---------- Kidney loader ---------- */
+
+.kidney-loader {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.kidney-glow {
+  animation: kidney-glow 2.6s var(--ease-in-out) infinite;
+  transform-origin: center;
+}
+
+@keyframes kidney-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.04);
+  }
+}
+
+.kidney-fill {
+  animation: kidney-fill 2.3s var(--ease-in-out) infinite;
+}
+
+@keyframes kidney-fill {
+  0% {
+    transform: translateY(178px);
+  }
+  45% {
+    transform: translateY(28px);
+  }
+  60% {
+    transform: translateY(40px);
+  }
+  80% {
+    transform: translateY(28px);
+  }
+  100% {
+    transform: translateY(178px);
+  }
+}
+
+.kidney-wave-shimmer {
+  animation: kidney-wave 3.4s linear infinite;
+}
+
+@keyframes kidney-wave {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-64px);
+  }
+}
+
+.kidney-drop {
+  animation: kidney-drop 2.2s var(--ease-out-soft) infinite;
+}
+
+@keyframes kidney-drop {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(-64px);
+    opacity: 0;
+  }
+}
+
+.kidney-cap-pulse {
+  animation: kidney-cap-pulse 2.3s var(--ease-in-out) infinite;
+}
+
+@keyframes kidney-cap-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* ---------- Boot splash ---------- */
+
+.splash-overlay {
+  opacity: 1;
+  transition:
+    opacity 460ms var(--ease-out-strong),
+    filter 460ms var(--ease-out-strong);
+}
+
+.splash-overlay.splash-exit {
+  opacity: 0;
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/* ---------- Shared inputs & controls ---------- */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  margin-top: -6px;
+  transition: transform 120ms var(--ease-out-soft);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-track {
+  background: transparent;
+  border: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -122,6 +281,11 @@ body {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .kidney-fill {
+    animation: none;
+    transform: translateY(70px);
   }
 }
 
