@@ -35,6 +35,77 @@ const ANALYSIS_PHASES = [
   "Assembling report",
 ] as const;
 
+/** Bosniak v2019 classification checklist (CT/MRI renal masses). */
+const BOSNIAK_FEATURES = [
+  { id: "thin-wall", label: "Mass is a simple fluid-attenuating cyst (thin, non-enhancing wall)" },
+  { id: "thin-septa", label: "Only thin (≤2 mm) septa, no enhancement" },
+  { id: "few-septa", label: "Few (1–3) thin septa with possible perceived enhancement" },
+  { id: "many-septa", label: "Multiple (≥4) septa or minimally thickened smooth walls/septa" },
+  { id: "nodule", label: "Enhancing soft-tissue nodule or irregular thickening (≥4 mm)" },
+  { id: "irregular", label: "Grossly irregular walls, or thick enhancing irregular septa" },
+  { id: "solid", label: "Clearly enhancing solid mass" },
+] as const;
+
+function bosniakClass(selected: Set<string>): { klass: string; note: string } | null {
+  if (selected.size === 0) return null;
+  if (selected.has("solid")) return { klass: "IV", note: "Clearly enhancing solid mass — malignant until proven otherwise." };
+  if (selected.has("nodule") || selected.has("irregular")) return { klass: "III", note: "Indeterminate, suspicious — surgical consultation recommended." };
+  if (selected.has("many-septa")) return { klass: "IIF", note: "Minimally complex — follow-up imaging advised." };
+  if (selected.has("thin-septa") || selected.has("few-septa")) return { klass: "II", note: "Minimally complex benign — routine follow-up." };
+  if (selected.has("thin-wall")) return { klass: "I", note: "Simple cyst — benign." };
+  return { klass: "I–II", note: "Check your findings; the checklist maps to Bosniak v2019." };
+}
+
+const MODALITY_CHECKLISTS: Partial<Record<ImagingModality, string[]>> = {
+  ultrasound: [
+    "Kidney size and length (small <9 cm suggests chronicity)",
+    "Cortical thickness and echogenicity",
+    "Corticomedullary differentiation",
+    "Hydronephrosis / pelvicalyceal dilation",
+    "Cysts (simple vs complex), masses, or stones",
+  ],
+  "ct-kub": [
+    "Renal size, contour, and symmetry",
+    "Stones — location, size, number (non-contrast phase)",
+    "Hydronephrosis and ureteral dilation",
+    "Cystic lesions — apply Bosniak v2019",
+    "Contrast-enhancing solid masses",
+  ],
+  "ct-abdomen": [
+    "Renal size, contour, and symmetry",
+    "Solid or cystic renal masses — apply Bosniak v2019",
+    "Perirenal fat stranding or collections",
+    "Vascular findings (renal artery, IVC)",
+    "Adjacent organ involvement",
+  ],
+  "ct-chest": [
+    "Lung parenchyma, pleura, and mediastinum",
+    "Pulmonary nodules or masses",
+    "Adenopathy and pleural effusion",
+    "Cardiac silhouette and great vessels",
+  ],
+  "mri-brain": [
+    "Diffusion restriction and ADC correlation",
+    "Mass lesions — enhancement pattern",
+    "Hemorrhage — signal characteristics",
+    "Ventricular size and midline shift",
+  ],
+  xray: [
+    "Exposure, rotation, and inspiration adequacy",
+    "Bony structures and alignment",
+    "Soft tissue and joint spaces",
+    "Implants or foreign bodies",
+  ],
+  "chest-xray": [
+    "Exposure, rotation, and inspiration adequacy",
+    "Lung fields — opacities, nodules, infiltrates",
+    "Pleural spaces and costophrenic angles",
+    "Cardiac silhouette and hilar contours",
+  ],
+};
+
+type BosniakFeatureId = (typeof BOSNIAK_FEATURES)[number]["id"];
+
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -93,6 +164,9 @@ export default function ImagingWorkspace() {
   const [sample, setSample] = useState<Sample>(null);
   const [dragOrigin, setDragOrigin] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [breakpoint, setBreakpoint] = useState<Breakpoint>("desktop");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [checkedFindings, setCheckedFindings] = useState<Set<string>>(new Set());
+  const [bosniakSelected, setBosniakSelected] = useState<Set<string>>(new Set());
 
   const [modality, setModality] = useState<ImagingModality>("ultrasound");
   const [clinicalQuestion, setClinicalQuestion] = useState("");
@@ -136,6 +210,30 @@ export default function ImagingWorkspace() {
   useEffect(() => () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   }, [sourceUrl]);
+
+  const toggleFinding = (id: string) => {
+    setCheckedFindings((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleBosniak = (id: string) => {
+    setBosniakSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingFile(false);
+    loadFile(event.dataTransfer.files?.[0]);
+  };
 
   useEffect(() => {
     if (analysisState !== "loading") return;
@@ -353,7 +451,13 @@ export default function ImagingWorkspace() {
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `0 ${pagePad} ${pagePad}`, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "2rem", alignItems: "start" }}>
 
         {/* Image Viewer Card */}
-        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
+        <div
+          style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", overflow: "hidden", boxShadow: isDraggingFile ? "0 0 0 2px var(--accent)" : "var(--shadow-card)", transition: "box-shadow 140ms ease, border-color 140ms ease" }}
+          onDragOver={(event) => { event.preventDefault(); setIsDraggingFile(true); }}
+          onDragLeave={(event) => { if (event.currentTarget === event.target) setIsDraggingFile(false); }}
+          onDrop={handleFileDrop}
+          onDragEnd={() => setIsDraggingFile(false)}
+        >
           {/* Viewer Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderBottom: "1px solid var(--border)", backgroundColor: "var(--surface-raised)", padding: "1rem" }}>
             <div style={{ minWidth: 0 }}>
@@ -378,8 +482,10 @@ export default function ImagingWorkspace() {
                   <div style={{ width: "48px", height: "48px", margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.05)" }}>
                     <span style={{ color: "rgba(255,255,255,0.8)" }}><Icon name="upload" className="size-5" /></span>
                   </div>
-                  <p style={{ fontSize: "14px", fontWeight: "600", marginBottom: "0.5rem" }}>Choose a de-identified image</p>
-                  <p style={{ fontSize: "12px", opacity: 0.7 }}>Local tools run in your browser; provider review is opt-in.</p>
+                  <p style={{ fontSize: "14px", fontWeight: "600", marginBottom: "0.5rem" }}>
+                    {isDraggingFile ? "Drop the image to review" : "Choose a de-identified image"}
+                  </p>
+                  <p style={{ fontSize: "12px", opacity: 0.7 }}>Local tools run in your browser; provider review is opt-in. Drag & drop works too.</p>
                 </div>
               </div>
             )}
@@ -511,6 +617,66 @@ export default function ImagingWorkspace() {
             Explore de-identified teaching data <Icon name="arrow" className="size-4" />
           </a>
         </div>
+      </section>
+
+      {/* Structured review */}
+      <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "2rem", alignItems: "start" }}>
+        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
+          <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Structured checklist</h6>
+          <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.75rem", letterSpacing: "-0.02em" }}>{modalityLabel[modality]}</h2>
+          <p style={{ fontSize: "13px", opacity: 0.8, lineHeight: 1.6, marginBottom: "1.25rem" }}>
+            What to look for in this modality. Check off what you observe — the list stays in your browser and never leaves it.
+          </p>
+          {(MODALITY_CHECKLISTS[modality] ?? []).map((item) => {
+            const id = `f-${item}`;
+            const checked = checkedFindings.has(id);
+            return (
+              <label key={id} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", padding: "0.625rem 0.75rem", borderRadius: controlRadius, backgroundColor: checked ? accentMuted(6) : "transparent", fontSize: "13px", lineHeight: 1.5, cursor: "pointer", transition: "background-color 120ms ease" }}>
+                <input type="checkbox" checked={checked} onChange={() => toggleFinding(id)} style={{ marginTop: "3px", cursor: "pointer", width: "16px", height: "16px", accentColor: accent }} />
+                <span style={checked ? { color: "var(--text)", textDecoration: "line-through", textDecorationColor: accentMuted(50), opacity: 0.75 } : { color: "var(--text)" }}>{item}</span>
+              </label>
+            );
+          })}
+          {checkedFindings.size > 0 && (
+            <p style={{ fontSize: "11px", fontFamily: "var(--font-mono)", opacity: 0.6, margin: "0.75rem 0 0" }}>
+              {checkedFindings.size} finding{checkedFindings.size === 1 ? "" : "s"} marked
+            </p>
+          )}
+        </div>
+
+        {(modality === "ct-kub" || modality === "ct-abdomen" || modality === "mri-brain" || modality === "other") ? (
+          <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface-inset)", padding: isMobile ? "1.5rem" : "2rem" }}>
+            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Bosniak v2019 assist</h6>
+            <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.75rem", letterSpacing: "-0.02em" }}>Cystic renal mass</h2>
+            <p style={{ fontSize: "13px", opacity: 0.8, lineHeight: 1.6, marginBottom: "1.25rem" }}>
+              Tick every feature that applies on CT/MRI. The strictest applicable class is suggested — educational aid only, never a diagnosis.
+            </p>
+            {BOSNIAK_FEATURES.map((feature) => {
+              const checked = bosniakSelected.has(feature.id);
+              return (
+                <label key={feature.id} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", padding: "0.625rem 0.75rem", borderRadius: controlRadius, backgroundColor: checked ? accentMuted(6) : "transparent", fontSize: "13px", lineHeight: 1.5, cursor: "pointer", transition: "background-color 120ms ease" }}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleBosniak(feature.id)} style={{ marginTop: "3px", cursor: "pointer", width: "16px", height: "16px", accentColor: accent }} />
+                  <span style={{ color: "var(--text)" }}>{feature.label}</span>
+                </label>
+              );
+            })}
+            {(() => {
+              const result = bosniakClass(bosniakSelected);
+              if (!result) return <p style={{ fontSize: "13px", opacity: 0.7, margin: "1rem 0 0" }}>Select features to see the suggested class.</p>;
+              return (
+                <div style={{ marginTop: "1rem", padding: "1rem", borderRadius: controlRadius, border: "1px solid", borderColor: accentMuted(30), backgroundColor: accentMuted(5) }}>
+                  <p style={{ fontSize: "13px", fontWeight: "700", color: accent, margin: "0 0 0.25rem" }}>
+                    Suggested class: Bosniak {result.klass}
+                  </p>
+                  <p style={{ fontSize: "12px", opacity: 0.8, lineHeight: 1.5, margin: 0 }}>{result.note}</p>
+                </div>
+              );
+            })()}
+            <p style={{ fontSize: "11px", opacity: 0.6, margin: "1rem 0 0", lineHeight: 1.5 }}>
+              Bosniak MA et al. Radiology 2019;292:475–488. Malignancy likelihood rises steeply from IIF to IV; class is not a substitute for a radiologist&apos;s read.
+            </p>
+          </div>
+        ) : null}
       </section>
 
       {/* Report Output */}
