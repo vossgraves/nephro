@@ -1,6 +1,6 @@
 export type RecognitionProvider = "openai" | "gemini";
 
-export type ImagingModality = "xray" | "ultrasound" | "ct-export" | "mri-export" | "other";
+export type ImagingModality = "xray" | "chest-xray" | "ultrasound" | "ct-kub" | "ct-abdomen" | "ct-chest" | "mri-brain" | "other";
 
 export type RecognitionReport = {
   provider: RecognitionProvider;
@@ -34,10 +34,13 @@ export const providerLabel: Record<RecognitionProvider, string> = {
 };
 
 export const modalityLabel: Record<ImagingModality, string> = {
-  xray: "X-ray / radiograph",
+  "chest-xray": "Chest X-ray",
+  "ct-kub": "CT KUB (Kidney, Ureters, Bladder)",
+  "ct-abdomen": "CT Abdomen",
+  "ct-chest": "CT Chest",
+  xray: "General X-ray / Radiograph",
   ultrasound: "Ultrasound",
-  "ct-export": "CT exported image",
-  "mri-export": "MRI exported image",
+  "mri-brain": "MRI Brain",
   other: "Other exported image",
 };
 
@@ -63,23 +66,38 @@ export function recognitionSystemPrompt(modality: ImagingModality, clinicalQuest
     ? `The user’s non-identifying review question is: ${clinicalQuestion.trim()}`
     : "No clinical question was provided.";
 
-  return `You are an AI-assisted visual-review tool inside a healthcare product. You are NOT a radiologist and must not diagnose, rule out disease, prescribe, estimate risk, or claim regulatory/clinical validation. Analyze only directly visible image characteristics and quality limitations. Do not infer patient identity, age, sex, or medical history from the image. Do not mention a disease unless the image itself visibly contains text naming it; even then, report only that text is present.
+  const modalityGuidance: Record<ImagingModality, string> = {
+    "chest-xray": "Focus on visible anatomy, technical quality (penetration, rotation, positioning), and image artifacts. Do not identify pathology.",
+    "ct-kub": "Note CT quality (motion artifact, contrast phases if visible), scout positioning, and any visible anatomic landmarks (kidney size, laterality, spine). No disease interpretation.",
+    "ct-abdomen": "Assess image quality, slice artifact, contrast timing, and visible organ boundaries. Describe only directly visualized structures.",
+    "ct-chest": "Evaluate technical factors: motion, contrast arrival, positioning, and visible mediastinal/pleural anatomy. No diagnostic claims.",
+    xray: "General radiograph review: assess technique (exposure, alignment), positioning, and image quality. Do not diagnose.",
+    ultrasound: "Evaluate ultrasound technique (probe artifact, shadowing), image clarity, and directly visible tissue characteristics. No diagnoses.",
+    "mri-brain": "Assess MRI sequence quality, artifacts, clearly visible anatomy (ventricles, sulci, gray/white matter). No clinical interpretation.",
+    other: "Review the image for technical quality and visible characteristics only. Avoid any disease-specific interpretation.",
+  };
 
-The uploaded image is labeled by the user as: ${modalityLabel[modality]}. It may be an exported screenshot, not a full DICOM study. ${question}
+  return `You are an AI-assisted visual-review tool inside a healthcare product. You are NOT a radiologist and must not diagnose, rule out disease, prescribe, estimate risk, or claim regulatory/clinical validation. Analyze only directly visible image characteristics, technical quality, and limitations. Do not infer patient identity, age, sex, or medical history from the image. Do not mention a disease unless the image itself visibly contains text naming it.
+
+The uploaded image is labeled by the user as: ${modalityLabel[modality]}. It may be a single exported slice/frame, not a complete study.
+
+${modalityGuidance[modality]}
+
+${question}
 
 Return strict JSON only, matching this exact schema:
 {
   "reviewStatus": "reviewable" | "limited" | "not-reviewable",
-  "summary": "one brief, cautious, non-diagnostic summary",
-  "imageQuality": {"assessment": "brief image-quality description", "limitations": ["specific limitation"]},
-  "observedVisualFeatures": ["directly visible non-diagnostic feature"],
-  "notAssessableFromThisImage": ["important item that cannot be determined from this input"],
-  "clinicianQuestions": ["question a qualified clinician could consider"],
-  "uncertainty": "brief explanation of uncertainty and why a clinician must review",
+  "summary": "one brief, factual summary of image quality and directly visible features, without diagnosis",
+  "imageQuality": {"assessment": "brief assessment of technical quality, artifacts, and limitations", "limitations": ["specific technical limitation", "positioning issue", "artifact or quality factor"]},
+  "observedVisualFeatures": ["directly visible anatomic structure or technical feature", "no disease claims"],
+  "notAssessableFromThisImage": ["information that cannot be determined from this single image"],
+  "clinicianQuestions": ["question a qualified clinician should ask about the original study"],
+  "uncertainty": "brief note on why a clinician must review the original study",
   "safetyNote": "AI-assisted visual review only. This output is not a diagnosis, radiology report, or treatment recommendation and must be reviewed by a qualified clinician."
 }
 
-Use empty arrays instead of inventing findings. Never fabricate measurements, regions of interest, confidence percentages, or patient-specific results.`;
+Rules: Use empty arrays instead of inventing findings. Never fabricate measurements, regions, confidence percentages, or pathology. Keep the summary and features purely technical and structural.`;
 }
 
 function asString(value: unknown, fallback: string) {
