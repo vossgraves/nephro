@@ -1,5 +1,6 @@
 import {
   kdigoRisk,
+  MONITORING_PER_YEAR,
   type AlbStage,
   type GfrStage,
   type RiskLevel,
@@ -27,13 +28,16 @@ const FILL: Record<RiskLevel, string> = {
   "very-high": "bg-very-high/45",
 };
 
-/** KDIGO prognosis grid. Highlights the cell the patient actually falls in. */
+/**
+ * KDIGO 2024 prognosis grid with the recommended eGFR/uACR monitoring
+ * frequency printed inside every cell. Highlights the patient's own cell.
+ */
 export function KdigoHeatmap({ g, a }: { g?: GfrStage; a?: AlbStage }) {
   return (
     <figure className="overflow-x-auto">
       <table className="w-full border-separate border-spacing-1 text-center text-xs">
         <caption className="sr-only">
-          KDIGO risk of adverse outcomes by GFR and albuminuria category
+          KDIGO risk of adverse outcomes and monitoring frequency by GFR and albuminuria category
         </caption>
         <thead>
           <tr>
@@ -55,18 +59,30 @@ export function KdigoHeatmap({ g, a }: { g?: GfrStage; a?: AlbStage }) {
               </th>
               {ALB_COLS.map((col) => {
                 const risk = kdigoRisk(row.stage, col.stage);
+                const visits = MONITORING_PER_YEAR[row.stage][col.stage];
                 const active = g === row.stage && a === col.stage;
                 return (
                   <td
                     key={col.stage}
                     aria-current={active ? "true" : undefined}
                     className={[
-                      "rounded-[var(--radius-base)] p-2.5 font-medium",
+                      "rounded-[var(--radius-base)] p-2 font-medium",
                       FILL[risk],
                       active ? "ring-2 ring-text ring-offset-1 ring-offset-surface" : "",
                     ].join(" ")}
                   >
-                    {active ? "This patient" : "\u00A0"}
+                    {active ? (
+                      <span className="text-[11px] font-bold leading-none">
+                        This patient
+                        <span className="mt-1 block font-medium opacity-80">
+                          check {visits}×/yr
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium leading-none opacity-70">
+                        {visits}×/yr
+                      </span>
+                    )}
                   </td>
                 );
               })}
@@ -74,7 +90,7 @@ export function KdigoHeatmap({ g, a }: { g?: GfrStage; a?: AlbStage }) {
           ))}
         </tbody>
       </table>
-      <figcaption className="mt-3 flex flex-wrap gap-3 text-xs text-muted">
+      <figcaption className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted">
         {(
           [
             ["low", "Low"],
@@ -88,6 +104,9 @@ export function KdigoHeatmap({ g, a }: { g?: GfrStage; a?: AlbStage }) {
             {label}
           </span>
         ))}
+        <span className="w-full text-[11px]">
+          Numbers inside cells = recommended eGFR/uACR monitoring visits per year (KDIGO 2024).
+        </span>
       </figcaption>
     </figure>
   );

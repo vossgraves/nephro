@@ -136,7 +136,13 @@ export default function CalculatorPage() {
       risk,
       kf,
       aki,
-      guidance: guidance({ egfr, acrMgG, risk, kfre2: kf?.risk2yr }),
+      guidance: guidance({
+        egfr,
+        acrMgG,
+        risk,
+        kfre2: kf?.risk2yr,
+        kfre5: kf?.risk5yr,
+      }),
     };
   }, [age, scr, scrUnit, acr, acrUnit, weight, sex, region, baseScr, urineOut]);
 
