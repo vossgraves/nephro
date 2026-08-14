@@ -136,12 +136,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json() as Partial<RecognitionRequest>;
-    const provider = body.provider;
     const modality = body.modality;
 
-    if (provider !== "openai" && provider !== "gemini") {
-      return noStoreJson({ error: "Choose OpenAI Vision or Gemini Vision." }, { status: 400 });
-    }
     if (!modality || !ALLOWED_MODALITIES.has(modality)) {
       return noStoreJson({ error: "Choose an image modality." }, { status: 400 });
     }
@@ -154,29 +150,56 @@ export async function POST(request: Request) {
 
     parseImageDataUrl(body.imageDataUrl);
     const payload: RecognitionRequest = {
-      provider,
+      provider: "gemini", // will be updated by the actual provider used
       modality,
       imageDataUrl: body.imageDataUrl,
       clinicalQuestion: typeof body.clinicalQuestion === "string" ? body.clinicalQuestion.slice(0, 600) : undefined,
       deidentifiedConfirmed: true,
     };
 
-    const report = provider === "openai"
-      ? await analyzeWithOpenAI(payload)
-      : await analyzeWithGemini(payload);
+    // Try Gemini first, fall back to OpenAI
+    let report;
+    let usedProvider: RecognitionProvider = "gemini";
+
+    try {
+      if (process.env.GEMINI_API_KEY) {
+        report = await analyzeWithGemini(payload);
+      } else {
+        throw new Error("GEMINI_NOT_CONFIGURED");
+      }
+    } catch (geminiError) {
+      console.warn("Gemini analysis failed, attempting OpenAI fallback", { error: geminiError instanceof Error ? geminiError.message : String(geminiError) });
+
+      if (process.env.OPENAI_API_KEY) {
+        payload.provider = "openai";
+        usedProvider = "openai";
+        report = await analyzeWithOpenAI(payload);
+      } else {
+        throw new Error("NO_PROVIDERS_CONFIGURED");
+      }
+    }
+
+    // Ensure report has the correct provider metadata
+    if (report && usedProvider === "openai") {
+      report.provider = "openai";
+    }
 
     return noStoreJson({ report });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected analysis error.";
-    if (message === "OPENAI_NOT_CONFIGURED" || message === "GEMINI_NOT_CONFIGURED") {
+    if (message === "NO_PROVIDERS_CONFIGURED") {
       return noStoreJson({
-        error: message === "OPENAI_NOT_CONFIGURED"
-          ? "OpenAI Vision is not configured on this deployment. Add OPENAI_API_KEY as a server-side environment variable."
-          : "Gemini Vision is not configured on this deployment. Add GEMINI_API_KEY as a server-side environment variable.",
+        error: "No AI providers configured. Add GEMINI_API_KEY and/or OPENAI_API_KEY as server-side environment variables.",
+        code: "NO_PROVIDERS_CONFIGURED",
+      }, { status: 503 });
+    }
+    if (message === "GEMINI_NOT_CONFIGURED" || message === "OPENAI_NOT_CONFIGURED") {
+      return noStoreJson({
+        error: "No available AI providers. Ensure GEMINI_API_KEY and/or OPENAI_API_KEY are configured.",
         code: "PROVIDER_NOT_CONFIGURED",
       }, { status: 503 });
     }
     console.error("Imaging review request failed", { code: message.split(":")[0] });
-    return noStoreJson({ error: message.includes("REQUEST_FAILED") ? "The selected provider could not complete the review. Try again later or choose the other configured provider." : message }, { status: 422 });
+    return noStoreJson({ error: message.includes("REQUEST_FAILED") ? "Both providers failed. Try again later." : message }, { status: 422 });
   }
 }

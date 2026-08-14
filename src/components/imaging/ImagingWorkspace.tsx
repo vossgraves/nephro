@@ -87,11 +87,10 @@ export default function ImagingWorkspace() {
   const [dragOrigin, setDragOrigin] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [breakpoint, setBreakpoint] = useState<Breakpoint>("desktop");
 
-  const [provider, setProvider] = useState<RecognitionProvider>("openai");
   const [modality, setModality] = useState<ImagingModality>("ultrasound");
   const [clinicalQuestion, setClinicalQuestion] = useState("");
   const [deidentifiedConfirmed, setDeidentifiedConfirmed] = useState(false);
-  const [configuration, setConfiguration] = useState<Record<RecognitionProvider, boolean | null>>({ openai: null, gemini: null });
+  const [providerStatus, setProviderStatus] = useState<"ready" | "checking" | "unavailable">("checking");
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [report, setReport] = useState<RecognitionReport | null>(null);
@@ -110,9 +109,13 @@ export default function ImagingWorkspace() {
     fetch("/api/imaging/analyze", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
       .then((data: { configured?: Record<RecognitionProvider, boolean> } | null) => {
-        if (data?.configured) setConfiguration(data.configured);
+        if (data?.configured?.gemini || data?.configured?.openai) {
+          setProviderStatus("ready");
+        } else {
+          setProviderStatus("unavailable");
+        }
       })
-      .catch(() => setConfiguration({ openai: null, gemini: null }));
+      .catch(() => setProviderStatus("unavailable"));
   }, []);
 
   useEffect(() => {
@@ -280,10 +283,10 @@ export default function ImagingWorkspace() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ provider, modality, imageDataUrl, clinicalQuestion, deidentifiedConfirmed }),
+        body: JSON.stringify({ modality, imageDataUrl, clinicalQuestion, deidentifiedConfirmed }),
       });
       const data = await response.json() as { report?: RecognitionReport; error?: string };
-      if (!response.ok || !data.report) throw new Error(data.error || "The selected provider returned an incomplete response.");
+      if (!response.ok || !data.report) throw new Error(data.error || "Analysis failed. Please try again.");
       setReport(data.report);
       setAnalysisState("success");
     } catch (error) {
@@ -293,8 +296,7 @@ export default function ImagingWorkspace() {
   };
 
   const imagePropertyLabel = useMemo(() => info ? `${info.width.toLocaleString()} × ${info.height.toLocaleString()} px` : "Waiting for a local image", [info]);
-  const selectedConfigured = configuration[provider];
-  const analysisBlocked = !imageDataUrl || !deidentifiedConfirmed || file?.size && file.size > MAX_ANALYSIS_FILE_BYTES || selectedConfigured === false || analysisState === "loading";
+  const analysisBlocked = !imageDataUrl || !deidentifiedConfirmed || file?.size && file.size > MAX_ANALYSIS_FILE_BYTES || providerStatus === "unavailable" || analysisState === "loading";
 
   const isPhone = breakpoint === "phone";
   const isTablet = breakpoint === "tablet";
@@ -430,24 +432,9 @@ export default function ImagingWorkspace() {
               <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0" }}>AI-assisted visual review</h6>
               <h2 style={{ fontSize: "22px", fontWeight: "bold", marginTop: "0.75rem", marginBottom: "0" }}>Powered analysis, not faked diagnosis.</h2>
             </div>
-            <span style={{ display: "inline-block", backgroundColor: selectedConfigured ? "rgba(198, 113, 57, 0.1)" : "rgba(245, 158, 11, 0.1)", color: selectedConfigured ? "#c67139" : "#a16207", padding: "0.5rem 1rem", borderRadius: "999px", fontSize: "12px", fontWeight: "600", width: "fit-content" }}>
-              {selectedConfigured ? "Provider configured" : configuration[provider] === null ? "Checking..." : "Needs setup"}
+            <span style={{ display: "inline-block", backgroundColor: providerStatus === "ready" ? "rgba(198, 113, 57, 0.1)" : "rgba(245, 158, 11, 0.1)", color: providerStatus === "ready" ? "#c67139" : "#a16207", padding: "0.5rem 1rem", borderRadius: "999px", fontSize: "12px", fontWeight: "600", width: "fit-content" }}>
+              {providerStatus === "ready" ? "Ready to analyze" : providerStatus === "checking" ? "Checking providers..." : "Providers unavailable"}
             </span>
-          </div>
-
-          {/* Provider Selection */}
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "0.5rem" }}>Provider</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem", border: `1px solid ${provider === "openai" ? "#c67139" : "var(--border)"}`, borderRadius: "6px", backgroundColor: provider === "openai" ? "rgba(198, 113, 57, 0.05)" : "transparent", cursor: "pointer", fontSize: "13px", fontWeight: "500" }}>
-                <input type="radio" name="provider" checked={provider === "openai"} onChange={() => { setProvider("openai"); setAnalysisError(null); setReport(null); }} style={{ cursor: "pointer" }} />
-                OpenAI
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem", border: `1px solid ${provider === "gemini" ? "#c67139" : "var(--border)"}`, borderRadius: "6px", backgroundColor: provider === "gemini" ? "rgba(198, 113, 57, 0.05)" : "transparent", cursor: "pointer", fontSize: "13px", fontWeight: "500" }}>
-                <input type="radio" name="provider" checked={provider === "gemini"} onChange={() => { setProvider("gemini"); setAnalysisError(null); setReport(null); }} style={{ cursor: "pointer" }} />
-                Gemini
-              </label>
-            </div>
           </div>
 
           {/* Modality Selection */}
@@ -467,7 +454,7 @@ export default function ImagingWorkspace() {
           {/* Consent Checkbox */}
           <label style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", padding: "1rem", backgroundColor: "rgba(0,0,0,0.02)", borderRadius: "8px", fontSize: "12px", lineHeight: 1.5, marginBottom: "1.5rem", cursor: "pointer" }}>
             <input type="checkbox" checked={deidentifiedConfirmed} onChange={(event) => setDeidentifiedConfirmed(event.target.checked)} style={{ marginTop: "2px", cursor: "pointer", width: "16px", height: "16px" }} />
-            <span>I confirm this is a de-identified exported image and consent to send it to <strong>{providerLabel[provider]}</strong> for AI-assisted review. The image is not permanently stored by Nephro.</span>
+            <span>I confirm this is a de-identified exported image and consent to send it to configured AI providers for visual review. The image is not permanently stored by Nephro.</span>
           </label>
 
           {/* Alerts */}
