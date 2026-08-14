@@ -319,7 +319,7 @@ export default function ImagingWorkspace() {
 
         {/* Clinical Boundary Warning */}
         <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", borderRadius: "12px", backgroundColor: "#c6713920", padding: "1.5rem", marginBottom: isMobile ? "2rem" : "3rem" }}>
-          <Icon name="warning" className="size-5" style={{ color: "#c67139", flexShrink: 0, marginTop: "2px" }} />
+          <span style={{ color: "#c67139", flexShrink: 0, marginTop: "2px" }}><Icon name="warning" className="size-5" /></span>
           <div>
             <strong style={{ fontSize: "13px", color: "#c67139" }}>Clinical boundary.</strong>
             <span style={{ fontSize: "13px", opacity: 0.85, display: "block", marginTop: "0.25rem" }}>Do not upload identifiable patient images. This is not a medical device, radiology report, or treatment recommendation.</span>
@@ -354,7 +354,7 @@ export default function ImagingWorkspace() {
               <div style={{ position: "absolute", inset: "1rem", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
                 <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
                   <div style={{ width: "48px", height: "48px", margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.05)" }}>
-                    <Icon name="upload" className="size-5" style={{ color: "rgba(255,255,255,0.8)" }} />
+                    <span style={{ color: "rgba(255,255,255,0.8)" }}><Icon name="upload" className="size-5" /></span>
                   </div>
                   <p style={{ fontSize: "14px", fontWeight: "600", marginBottom: "0.5rem" }}>Choose a de-identified image</p>
                   <p style={{ fontSize: "12px", opacity: 0.7 }}>Local tools run in your browser; provider review is opt-in.</p>
@@ -497,7 +497,7 @@ export default function ImagingWorkspace() {
           <div style={{ borderRadius: "16px", border: "2px solid rgba(198, 113, 57, 0.3)", backgroundColor: "rgba(198, 113, 57, 0.05)", padding: isMobile ? "1.5rem" : "2rem" }}>
             <div style={{ marginBottom: "1.5rem", paddingBottom: "1.5rem", borderBottom: "1px solid rgba(198, 113, 57, 0.2)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Icon name="check" className="size-4" style={{ color: "#c67139" }} />
+                <span style={{ color: "#c67139" }}><Icon name="check" className="size-4" /></span>
                 <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: "#c67139", textTransform: "uppercase", margin: "0" }}>Review complete</h6>
               </div>
               <h2 style={{ fontSize: "22px", fontWeight: "bold", margin: "0.5rem 0 0" }}>Report output</h2>
