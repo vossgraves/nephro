@@ -40,7 +40,7 @@ function configured(provider: RecognitionProvider) {
 async function analyzeWithOpenAI(payload: RecognitionRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
-  const model = process.env.OPENAI_VISION_MODEL || "gpt-5-mini";
+  const model = process.env.OPENAI_VISION_MODEL || "gpt-5.6-terra";
   const baseUrl = (process.env.OPENAI_API_BASE || "https://api.openai.com/v1").replace(/\/$/, "");
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -85,7 +85,7 @@ async function analyzeWithOpenAI(payload: RecognitionRequest) {
 async function analyzeWithGemini(payload: RecognitionRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_NOT_CONFIGURED");
-  const model = process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash";
+  const model = process.env.GEMINI_VISION_MODEL || "gemini-3.6-flash";
   const { mimeType, base64 } = parseImageDataUrl(payload.imageDataUrl);
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
         code: "PROVIDER_NOT_CONFIGURED",
       }, { status: 503 });
     }
-    console.error("Imaging review request failed", { code: message.split(":")[0] });
+    console.error("Imaging review request failed", { code: message.split(":")[0], detail: message });
     return noStoreJson({ error: message.includes("REQUEST_FAILED") ? "Both providers failed. Try again later." : message }, { status: 422 });
   }
 }
