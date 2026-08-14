@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { KdigoHeatmap } from "@/components/KdigoHeatmap";
 import { Card, Field, InputGroup, inputClass, unitSelectClass } from "@/components/Field";
 import { saveRecord } from "@/app/records/actions";
@@ -94,6 +94,11 @@ export default function CalculatorPage() {
   const [history, setHistory] = useState<SavedCalc[]>(() => loadJson<SavedCalc[]>(HISTORY_KEY, []));
   const [favorites, setFavorites] = useState<SavedCalc[]>(() => loadJson<SavedCalc[]>(FAVES_KEY, []));
   const [toast, setToast] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const persistHistory = (items: SavedCalc[]) => {
     setHistory(items);
@@ -595,7 +600,7 @@ export default function CalculatorPage() {
             )}
           </Card>
 
-          {(history.length > 0 || favorites.length > 0) && (
+          {mounted && (history.length > 0 || favorites.length > 0) && (
             <Card
               title="Saved calculations"
               description="Stored only in this browser (localStorage) — nothing is sent anywhere."
