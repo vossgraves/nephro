@@ -1605,7 +1605,7 @@ export default function ImagingWorkspace() {
       {/* Header Section */}
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad} ${pagePad} 0` }}>
         <div style={{ marginBottom: isMobile ? "2rem" : "3rem" }}>
-          <h6 style={{ color: accent, fontSize: "12px", fontWeight: "600", letterSpacing: "0.2em", marginBottom: "0.5rem", textTransform: "uppercase" }}>Imaging review workspace</h6>
+          <p style={{ color: accent, fontSize: "12px", fontWeight: "600", letterSpacing: "0.2em", marginBottom: "0.5rem", textTransform: "uppercase" }}>Imaging review workspace</p>
           <h1 style={{ fontSize: h1Size, fontWeight: "bold", marginBottom: "1.5rem", maxWidth: "640px", lineHeight: 1.2, letterSpacing: "-0.02em" }}>Real visual review, not simulated diagnosis.</h1>
           <p style={{ fontSize: "15px", opacity: 0.85, maxWidth: "600px", lineHeight: 1.6, marginBottom: isMobile ? "1.5rem" : "2rem" }}>
             Review exported, de-identified medical images locally, then optionally request an <strong>AI-assisted visual review</strong> from a configured OpenAI or Gemini provider. The report preserves uncertainty and never substitutes for clinical interpretation.
@@ -1836,7 +1836,7 @@ export default function ImagingWorkspace() {
         {/* Settings Card */}
         <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isPhone ? "1.5rem" : "2rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxShadow: "var(--shadow-card)" }}>
           <div>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Local controls</h6>
+            <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Local controls</p>
 
             {/* Brightness */}
             <div style={{ marginBottom: "1.5rem" }}>
@@ -1869,7 +1869,7 @@ export default function ImagingWorkspace() {
 
           {/* File Facts */}
           <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1.5rem" }}>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Local file facts</h6>
+            <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Local file facts</p>
             <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem 1rem", fontSize: "12px", margin: 0 }}>
               <div><dt style={{ opacity: 0.6 }}>Dimensions</dt><dd style={{ fontFamily: "var(--font-mono)", fontSize: "11px", marginTop: "0.25rem" }}>{info ? imagePropertyLabel : "—"}</dd></div>
               <div><dt style={{ opacity: 0.6 }}>Mean luminance</dt><dd style={{ fontFamily: "var(--font-mono)", fontSize: "11px", marginTop: "0.25rem" }}>{info ? `${info.luminance} / 255` : "—"}</dd></div>
@@ -1882,7 +1882,7 @@ export default function ImagingWorkspace() {
 
           {/* Technical image quality */}
           <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1.5rem" }}>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Technical image quality</h6>
+            <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Technical image quality</p>
             {quality ? (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem" }}>
@@ -1918,7 +1918,7 @@ export default function ImagingWorkspace() {
         <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
-              <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0" }}>AI-assisted visual review</h6>
+              <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0" }}>AI-assisted visual review</p>
               <h2 style={{ fontSize: "22px", fontWeight: "bold", marginTop: "0.75rem", marginBottom: "0", letterSpacing: "-0.02em" }}>Powered analysis, not faked diagnosis.</h2>
             </div>
             <span style={{ display: "inline-block", backgroundColor: providerStatus === "ready" ? accentMuted(10) : "rgba(245, 158, 11, 0.1)", color: providerStatus === "ready" ? accent : "#a16207", padding: "0.5rem 1rem", borderRadius: "999px", fontSize: "12px", fontWeight: "600", width: "fit-content" }}>
@@ -1970,7 +1970,7 @@ export default function ImagingWorkspace() {
 
         {/* Info Card */}
         <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface-inset)", padding: isPhone ? "1.5rem" : "2rem" }}>
-          <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Capabilities</h6>
+          <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Capabilities</p>
           <p style={{ fontSize: "13px", opacity: 0.8, lineHeight: 1.6, marginBottom: "1.5rem" }}>
             The report can describe visible image characteristics, technical quality, and limitations. It cannot replace a radiologist, analyze full DICOM studies, or validate disease findings.
           </p>
@@ -1984,7 +1984,7 @@ export default function ImagingWorkspace() {
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem", borderTop: "1px solid var(--border)" }}>
         <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
           <div style={{ marginBottom: "1.25rem" }}>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Ask about this image</h6>
+            <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Ask about this image</p>
             <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.5rem", letterSpacing: "-0.02em" }}>Questions answered against the loaded image.</h2>
             <p style={{ fontSize: "12px", opacity: 0.75, lineHeight: 1.6, margin: 0 }}>
               Sends the currently loaded image to the configured provider with your question, under the same de-identification consent as analysis. Answers are AI-assisted observations about the visible image only — not a diagnosis, radiology report, or treatment recommendation. Nothing is stored by Nephro.
@@ -2049,7 +2049,7 @@ export default function ImagingWorkspace() {
       {/* Structured review */}
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "2rem", alignItems: "start" }}>
         <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
-          <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Structured checklist</h6>
+          <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Structured checklist</p>
           <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.75rem", letterSpacing: "-0.02em" }}>{modalityLabel[modality]}</h2>
           <p style={{ fontSize: "13px", opacity: 0.8, lineHeight: 1.6, marginBottom: "1.25rem" }}>
             What to look for in this modality. Check off what you observe — the list stays in your browser and never leaves it.
@@ -2073,7 +2073,7 @@ export default function ImagingWorkspace() {
 
         {(modality === "ct-kub" || modality === "ct-abdomen" || modality === "mri-brain" || modality === "other") ? (
           <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface-inset)", padding: isMobile ? "1.5rem" : "2rem" }}>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Bosniak v2019 assist</h6>
+            <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Bosniak v2019 assist</p>
             <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.75rem", letterSpacing: "-0.02em" }}>Cystic renal mass</h2>
             <p style={{ fontSize: "13px", opacity: 0.8, lineHeight: 1.6, marginBottom: "1.25rem" }}>
               Tick every feature that applies on CT/MRI. The strictest applicable class is suggested — educational aid only, never a diagnosis.
@@ -2113,7 +2113,7 @@ export default function ImagingWorkspace() {
             <div style={{ marginBottom: "1.5rem", paddingBottom: "1.5rem", borderBottom: "1px solid", borderColor: accentMuted(20), display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <span style={{ color: accent }}><Icon name="check" className="size-4" /></span>
-                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0" }}>Review complete</h6>
+                <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0" }}>Review complete</p>
               </div>
               <h2 style={{ fontSize: "22px", fontWeight: "bold", margin: "0.5rem 0 0", letterSpacing: "-0.02em" }}>Report output</h2>
             </div>
@@ -2121,7 +2121,7 @@ export default function ImagingWorkspace() {
             {/* Structured findings review */}
             {report.observedVisualFeatures.length > 0 && (
               <div style={{ marginBottom: "1.5rem", paddingBottom: "1.5rem", borderBottom: "1px solid", borderColor: accentMuted(20) }}>
-                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Structured findings review</h6>
+                <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Structured findings review</p>
                 <p style={{ fontSize: "12px", opacity: 0.7, lineHeight: 1.6, margin: "0 0 1rem" }}>
                   Review each observation the AI listed. Your decisions feed the generated review report. The AI does not rate its own confidence, so features start as Not rated.
                 </p>
@@ -2161,11 +2161,11 @@ export default function ImagingWorkspace() {
 
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "2rem", marginBottom: "1.5rem" }}>
               <div>
-                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Summary</h6>
+                <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Summary</p>
                 <p style={{ fontSize: "14px", lineHeight: 1.6, marginBottom: "1.5rem" }}>{report.summary}</p>
 
                 <div style={{ borderRadius: "calc(var(--radius-base) - 2px)", border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: "1rem" }}>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Image quality</h6>
+                  <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Image quality</p>
                   <p style={{ fontSize: "13px", lineHeight: 1.5, marginBottom: "0.75rem" }}>{report.imageQuality.assessment}</p>
                   <List items={report.imageQuality.limitations} empty="No quality limitations noted." />
                 </div>
@@ -2173,15 +2173,15 @@ export default function ImagingWorkspace() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                 <div>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Directly visible features</h6>
+                  <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Directly visible features</p>
                   <List items={report.observedVisualFeatures} empty="No specific features returned." />
                 </div>
                 <div>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Not assessable</h6>
+                  <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>Not assessable</p>
                   <List items={report.notAssessableFromThisImage} empty="No limitations noted." />
                 </div>
                 <div>
-                  <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>For clinician review</h6>
+                  <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.75rem" }}>For clinician review</p>
                   <List items={report.clinicianQuestions} empty="No follow-up questions." />
                 </div>
               </div>
@@ -2202,7 +2202,7 @@ export default function ImagingWorkspace() {
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem", borderTop: "1px solid var(--border)" }}>
         <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
           <div style={{ marginBottom: "1.25rem" }}>
-            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Review report</h6>
+            <p style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Review report</p>
             <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.5rem", letterSpacing: "-0.02em" }}>Generate a review document from the current workspace.</h2>
             <p style={{ fontSize: "12px", opacity: 0.75, lineHeight: 1.6, margin: 0 }}>
               Combines the AI report with your confirmed / edited / rejected findings, checklist selections, pixel measurements and technical quality metrics, plus the AI-assistance notice. A working document for review by a qualified clinician — not a diagnosis.
