@@ -32,6 +32,10 @@ The `/imaging` workspace is a viewer plus an optional, clinician-gated review:
 - **AI-assisted visual review** (optional, opt-in per image): sends the image
   to a server-side AI provider and returns a normalized, non-diagnostic
   technical review.
+- **Finding review**: each AI-observed feature is reviewed per finding —
+  confirmed (kept), edited (replaces the original text), or rejected (excluded
+  from the report and counted as rejected). Findings that have not yet been
+  reviewed are still included in the report but marked "not reviewed".
 
 ### AI provider layer
 
@@ -92,7 +96,8 @@ Configure providers by copying `.env.example` to `.env.local` and adding
 
 ```bash
 npm test        # sequential unit tests: renal equations, imaging-report
-                # normalization, Bosniak classification, image-quality scoring
+                # normalization, Bosniak classification, image-quality scoring,
+                # review-report assembly
 npm run typecheck
 npm run build
 ```

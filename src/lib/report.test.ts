@@ -184,6 +184,36 @@ assert.ok(rejectedOut.includes("**3 of 3 finding(s) rejected and excluded.**"), 
 assert.ok(!rejectedOut.includes("**Visible features (with review status):**"), "no feature lines when all are rejected");
 assert.ok(!rejectedOut.includes("- a\n") && !rejectedOut.includes("- b\n") && !rejectedOut.includes("- c\n"), "rejected features must not render");
 
+/* ---- pending findings: listed and marked "not reviewed" ------------------- */
+const pendingOut = buildReviewReport({
+  modality: "ct-kub",
+  generatedAt: GEN,
+  report: { ...REPORT, summary: "Pending review.", observedVisualFeatures: ["Possible stone in left renal pelvis"], clinicianQuestions: [] },
+  findingStates: [{ text: "Possible stone in left renal pelvis", status: "pending" }],
+});
+assert.ok(
+  pendingOut.includes("- [pending] Possible stone in left renal pelvis — not reviewed"),
+  "pending finding must be listed and marked not reviewed",
+);
+
+/* ---- mixed pending / confirmed / edited / rejected ------------------------ */
+const mixedOut = buildReviewReport({
+  modality: "ultrasound",
+  generatedAt: GEN,
+  report: { ...REPORT, summary: "Mixed statuses.", observedVisualFeatures: ["A", "B", "C", "D"], clinicianQuestions: [] },
+  findingStates: [
+    { text: "A", status: "pending" },
+    { text: "B", status: "confirmed" },
+    { text: "C", status: "edited", editedText: "C edited" },
+    { text: "D", status: "rejected" },
+  ],
+});
+assert.ok(mixedOut.includes("- [pending] A — not reviewed"), "pending renders in mixed list");
+assert.ok(mixedOut.includes("- [confirmed] B"), "confirmed renders in mixed list");
+assert.ok(mixedOut.includes("- [edited] C — edited: C edited"), "edited renders in mixed list");
+assert.ok(!mixedOut.split("\n").includes("- D"), "rejected finding must be excluded from mixed list");
+assert.ok(mixedOut.includes("**1 of 4 finding(s) rejected and excluded.**"), "mixed list counts the rejected finding");
+
 /* ---- edited findings show the edited text --------------------------------- */
 assert.ok(
   fullOut.includes("- [edited] Normal parenchymal echogenicity pattern — edited: Parenchyma appears homogeneous"),

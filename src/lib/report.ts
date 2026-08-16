@@ -131,7 +131,9 @@ export function buildReviewReport(input: ReportInput): string {
     for (const feature of report.observedVisualFeatures) {
       const state = statesByText.get(feature.trim());
       if (state?.status === "rejected") continue; // excluded, only counted
-      if (state?.status === "edited") {
+      if (state?.status === "pending") {
+        featureLines.push(`- [pending] ${feature} — not reviewed`);
+      } else if (state?.status === "edited") {
         const edited = state.editedText?.trim() || feature;
         featureLines.push(`- [edited] ${feature} — edited: ${edited}`);
       } else if (state?.status === "confirmed") {

@@ -1341,9 +1341,9 @@ export default function ImagingWorkspace() {
     const states: ReportFindingState[] = [];
     report.observedVisualFeatures.forEach((feature, index) => {
       const state = findingStates[index];
-      if (!state || state.status === "pending") return;
-      if (state.status === "edited") states.push({ text: feature, status: "edited", editedText: state.text });
-      else states.push({ text: feature, status: state.status });
+      if (state && state.status === "edited") states.push({ text: feature, status: "edited", editedText: state.text });
+      else if (state && state.status !== "pending") states.push({ text: feature, status: state.status });
+      else states.push({ text: feature, status: "pending" });
     });
     return states.length > 0 ? states : undefined;
   }, [findingStates, report]);

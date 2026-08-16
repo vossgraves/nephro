@@ -89,20 +89,13 @@ If it shows "Providers unavailable" or "Checking providers...":
 3. Expected focus: sequence quality, ventricles, gray/white matter boundaries
 4. Should NOT interpret neurologic findings
 
-#### Test 4: Non-Scan Image (Expected: Graceful failure)
+#### Test 4: Non-Scan Image (Expected: Bounded, honest output)
 1. Upload a screenshot, photo, or unrelated image
 2. Click analyze
-3. **Gemini tries first, fails** → **OpenAI fallback attempts**
-4. Expected error response:
-```json
-{
-  "error": "This image does not appear to be medical imaging. Cannot provide review.",
-  "provider": "openai",
-  "model": "gpt-5-mini"
-}
-```
+3. The configured provider reviews it within the non-diagnostic system prompt (there is no separate "is this medical imaging" classifier)
+4. Expected behavior: the report comes back with `reviewStatus: "limited"` or `"not-reviewable"`, `notAssessableFromThisImage` populated, and no disease claims — or a provider error surfaced via `{ "error": "...", "code": "BOTH_PROVIDERS_FAILED", "providerDetails": [...] }` (503) if both providers fail
 
-**System correctly identifies non-medical images and rejects them** (no fake analysis)
+**Correctness check: the response never fabricates findings, and never claims the image "is not medical" unless the model says so inside the bounded report.**
 
 #### Test 5: Provider Fallback
 1. Disable Gemini key temporarily in Vercel (set to empty or remove)
