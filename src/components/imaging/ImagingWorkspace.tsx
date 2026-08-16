@@ -21,6 +21,7 @@ import {
 } from "@/lib/imaging-recognition";
 import { KidneyLoader } from "@/components/KidneyLoader";
 import { extractImageStats, ImageQualityMetrics, scoreFromStats } from "@/lib/image-quality";
+import { buildReviewReport, ReportFindingState, ReportMeasurementEntry } from "@/lib/report";
 import { BOSNIAK_FEATURES, bosniakClass } from "@/lib/bosniak";
 import {
   AnnotationShape,
@@ -51,9 +52,14 @@ import {
 
 type Sample = { x: number; y: number; value: string } | null;
 type ImageInfo = { width: number; height: number; luminance: number; source: string };
-type AnalysisState = "idle" | "loading" | "success" | "error";
+/** Real analysis progress: transitions happen at actual await points, never on a timer. */
+type AnalysisStage = "idle" | "uploading" | "waiting" | "done" | "error";
 type Breakpoint = "phone" | "tablet" | "desktop";
 type ActiveTool = "pan" | "select" | "arrow" | "circle" | "rect" | "freehand" | "text" | "distance" | "angle" | "area";
+type FindingStatus = "pending" | "confirmed" | "rejected" | "edited";
+type FindingState = { status: FindingStatus; text: string };
+type ChatMessage = { role: "user" | "assistant"; text: string; meta?: string };
+type ChatStatus = "idle" | "waiting" | "error";
 
 /** One committed workspace state (annotations + measurements) in the undo stack. */
 type HistoryEntry = { annotations: AnnotationShape[]; measurements: Measurement[] };
@@ -65,10 +71,10 @@ const MAX_HISTORY = 60;
 const ACCEPTED = new Set(["image/png", "image/jpeg", "image/webp"]);
 const modalities = Object.keys(modalityLabel) as ImagingModality[];
 
-const ANALYSIS_PHASES = [
-  "Contacting provider",
-  "Reading image",
-  "Assembling report",
+const SUGGESTED_QUESTIONS = [
+  "Describe the visible structures.",
+  "What limitations affect this image?",
+  "What should a student inspect first?",
 ] as const;
 
 /** Stroke colors for the three measurement kinds (distinct from annotation color). */
@@ -217,7 +223,10 @@ type IconName =
   | "angle"
   | "area"
   | "eraser"
-  | "x";
+  | "x"
+  | "copy"
+  | "download"
+  | "printer";
 
 function Icon({ name, className = "size-4" }: { name: IconName; className?: string }) {
   const props = {
@@ -258,6 +267,9 @@ function Icon({ name, className = "size-4" }: { name: IconName; className?: stri
   if (name === "area") return <svg {...props}><rect x="4" y="4" width="16" height="16" rx="1" /><path d="m4 20 16-16" /></svg>;
   if (name === "eraser") return <svg {...props}><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21" /><path d="M22 21H7M5 11l9 9" /></svg>;
   if (name === "x") return <svg {...props}><path d="M18 6 6 18M6 6l12 12" /></svg>;
+  if (name === "copy") return <svg {...props}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>;
+  if (name === "download") return <svg {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>;
+  if (name === "printer") return <svg {...props}><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>;
   return <svg {...props}><path d="M20 11a8 8 0 1 0 2 5.4" /><path d="M20 4v7h-7" /></svg>;
 }
 
@@ -304,6 +316,28 @@ function ToolButton({ icon, label, onClick, active = false, disabled = false }: 
     >
       <Icon name={icon} className="size-3.5" />
     </button>
+  );
+}
+
+function FindingChip({ status }: { status: FindingStatus }) {
+  const styleByStatus: Record<FindingStatus, { background: string; color: string; label: string }> = {
+    pending: { background: "var(--surface-inset)", color: "var(--muted)", label: "Not rated" },
+    confirmed: { background: "rgba(34, 197, 94, 0.12)", color: "#15803d", label: "Confirmed" },
+    edited: { background: "rgba(245, 158, 11, 0.12)", color: "#b45309", label: "Edited" },
+    rejected: { background: "rgba(239, 68, 68, 0.12)", color: "#b91c1c", label: "Rejected" },
+  };
+  const style = styleByStatus[status];
+  return (
+    <span style={{ padding: "0.2rem 0.5rem", borderRadius: "999px", fontSize: "10px", fontWeight: "700", letterSpacing: "0.05em", textTransform: "uppercase", background: style.background, color: style.color, whiteSpace: "nowrap" }}>{style.label}</span>
+  );
+}
+
+function MiniButton({ label, onClick, tone = "neutral", disabled = false }: { label: string; onClick: () => void; tone?: "neutral" | "accent" | "danger"; disabled?: boolean }) {
+  const background = tone === "accent" ? "var(--accent)" : tone === "danger" ? "rgba(239, 68, 68, 0.1)" : "transparent";
+  const color = tone === "accent" ? "var(--accent-fg)" : tone === "danger" ? "#b91c1c" : "var(--text)";
+  const border = tone === "accent" ? "var(--accent)" : tone === "danger" ? "rgba(239, 68, 68, 0.35)" : "var(--border)";
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className="pressable" style={{ padding: "0.3rem 0.6rem", fontSize: "11px", fontWeight: "600", background, color, border: `1px solid ${border}`, borderRadius: "calc(var(--radius-base) - 6px)", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1, whiteSpace: "nowrap", transition: "background-color 120ms ease, border-color 120ms ease, opacity 120ms ease" }}>{label}</button>
   );
 }
 
@@ -647,10 +681,23 @@ export default function ImagingWorkspace() {
   const [clinicalQuestion, setClinicalQuestion] = useState("");
   const [deidentifiedConfirmed, setDeidentifiedConfirmed] = useState(false);
   const [providerStatus, setProviderStatus] = useState<"ready" | "checking" | "unavailable">("checking");
-  const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
+  const [analysisStage, setAnalysisStage] = useState<AnalysisStage>("idle");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [report, setReport] = useState<RecognitionReport | null>(null);
-  const [phaseIndex, setPhaseIndex] = useState(0);
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatStatus, setChatStatus] = useState<ChatStatus>("idle");
+  const [chatError, setChatError] = useState<string | null>(null);
+  const chatListRef = useRef<HTMLDivElement>(null);
+
+  const [findingStates, setFindingStates] = useState<Record<number, FindingState>>({});
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+
+  const [generatedReport, setGeneratedReport] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<"copied" | "failed" | null>(null);
 
   const entry = history[historyIndex];
   const annotations = entry.annotations;
@@ -786,15 +833,6 @@ export default function ImagingWorkspace() {
     loadFile(event.dataTransfer.files?.[0]);
   };
 
-  useEffect(() => {
-    if (analysisState !== "loading") return;
-    setPhaseIndex(0);
-    const timer = window.setInterval(() => {
-      setPhaseIndex((index) => (index + 1) % ANALYSIS_PHASES.length);
-    }, 950);
-    return () => window.clearInterval(timer);
-  }, [analysisState]);
-
   const loadFile = useCallback((candidate: File | undefined) => {
     if (!candidate) return;
     if (candidate.size > MAX_LOCAL_FILE_BYTES) {
@@ -810,7 +848,17 @@ export default function ImagingWorkspace() {
     setFile(candidate);
     setReport(null);
     setAnalysisError(null);
-    setAnalysisState("idle");
+    setAnalysisStage("idle");
+    setChatMessages([]);
+    setChatInput("");
+    setChatStatus("idle");
+    setChatError(null);
+    setFindingStates({});
+    setEditingIndex(null);
+    setEditText("");
+    setGeneratedReport(null);
+    setGenerateError(null);
+    setCopyFeedback(null);
     resetView();
     setQuality(null);
     setHistory([{ annotations: [], measurements: [] }]);
@@ -1203,9 +1251,12 @@ export default function ImagingWorkspace() {
     if (!imageDataUrl || !file) { setAnalysisError("Choose an exported image first."); return; }
     if (!deidentifiedConfirmed) { setAnalysisError("Confirm that the image is de-identified before sending it to a provider."); return; }
     if (file.size > MAX_ANALYSIS_FILE_BYTES) { setAnalysisError("Provider review is limited to images smaller than 4 MB. You can still use local review tools."); return; }
-    setAnalysisState("loading");
+    setAnalysisStage("uploading");
     setAnalysisError(null);
     setReport(null);
+    setFindingStates({});
+    setEditingIndex(null);
+    setGeneratedReport(null);
     try {
       const response = await fetch("/api/imaging/analyze", {
         method: "POST",
@@ -1213,18 +1264,170 @@ export default function ImagingWorkspace() {
         cache: "no-store",
         body: JSON.stringify({ modality, imageDataUrl, clinicalQuestion, deidentifiedConfirmed }),
       });
+      // Headers arrived: the image has been uploaded. The provider is now processing.
+      setAnalysisStage("waiting");
       const data = await response.json() as { report?: RecognitionReport; error?: string };
       if (!response.ok || !data.report) throw new Error(data.error || "Analysis failed. Please try again.");
       setReport(data.report);
-      setAnalysisState("success");
+      setAnalysisStage("done");
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : "The analysis could not be completed.");
-      setAnalysisState("error");
+      setAnalysisStage("error");
     }
   };
 
+  const sendChatQuestion = async (rawQuestion: string) => {
+    const question = rawQuestion.trim();
+    if (!question || chatStatus === "waiting") return;
+    if (!imageDataUrl) { setChatStatus("error"); setChatError("Choose an image before asking a question."); return; }
+    if (!deidentifiedConfirmed) { setChatStatus("error"); setChatError("Confirm the de-identification checkbox before sending the image."); return; }
+    setChatMessages((current) => [...current, { role: "user", text: question }]);
+    setChatInput("");
+    setChatStatus("waiting");
+    setChatError(null);
+    try {
+      const response = await fetch("/api/imaging/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          imageDataUrl,
+          modality,
+          question,
+          deidentifiedConfirmed: true,
+          priorReport: report ?? undefined,
+        }),
+      });
+      const data = await response.json() as { answer?: string; provider?: RecognitionProvider; model?: string; error?: string };
+      const answer = data.answer;
+      if (!response.ok || typeof answer !== "string") throw new Error(data.error || "The provider did not return an answer. Please try again.");
+      const meta = data.provider && data.model ? `${providerLabel[data.provider]} · ${data.model}` : undefined;
+      setChatMessages((current) => [...current, { role: "assistant", text: answer, meta }]);
+      setChatStatus("idle");
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "The question could not be answered.");
+      setChatStatus("error");
+    }
+  };
+
+  useEffect(() => {
+    const list = chatListRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [chatMessages, chatStatus]);
+
+  const setFindingStatus = (index: number, status: FindingStatus, text: string) => {
+    setFindingStates((current) => ({ ...current, [index]: { status, text } }));
+  };
+
+  const startEditingFinding = (index: number, currentText: string) => {
+    setEditingIndex(index);
+    setEditText(currentText);
+  };
+
+  const saveEditedFinding = (index: number) => {
+    const trimmed = editText.trim();
+    if (trimmed) setFindingStatus(index, "edited", trimmed);
+    setEditingIndex(null);
+    setEditText("");
+  };
+
+  const cancelEditingFinding = () => {
+    setEditingIndex(null);
+    setEditText("");
+  };
+
+  const findingStatesForReport = useMemo(() => {
+    if (!report) return undefined;
+    const states: ReportFindingState[] = [];
+    report.observedVisualFeatures.forEach((feature, index) => {
+      const state = findingStates[index];
+      if (!state || state.status === "pending") return;
+      if (state.status === "edited") states.push({ text: feature, status: "edited", editedText: state.text });
+      else states.push({ text: feature, status: state.status });
+    });
+    return states.length > 0 ? states : undefined;
+  }, [findingStates, report]);
+
+  const checklistSelections = useMemo(() => {
+    if (checkedFindings.size === 0) return undefined;
+    const items: string[] = [];
+    for (const item of MODALITY_CHECKLISTS[modality] ?? []) {
+      if (checkedFindings.has(`f-${item}`)) items.push(item);
+    }
+    return items.length > 0 ? items : undefined;
+  }, [checkedFindings, modality]);
+
+  const naturalWidth = info?.width ?? 1;
+  const naturalHeight = info?.height ?? 1;
+
+  const measurementsForReport = useMemo(() => {
+    if (measurements.length === 0) return undefined;
+    const entries: ReportMeasurementEntry[] = measurements.map((measurement) => {
+      if (measurement.kind === "distance") {
+        return { label: "Distance", value: formatPixelLength(distancePixels(measurement.start, measurement.end, naturalWidth, naturalHeight)) };
+      }
+      if (measurement.kind === "angle") {
+        return { label: "Angle", value: formatAngleDegrees(angleDegrees(measurement.first, measurement.vertex, measurement.last, naturalWidth, naturalHeight)) };
+      }
+      return { label: "Area (ROI)", value: formatPixelArea(rectAreaPixels(measurement.corner, measurement.opposite, naturalWidth, naturalHeight)) };
+    });
+    return entries;
+  }, [measurements, naturalHeight, naturalWidth]);
+
+  const canGenerateReport = Boolean(report) || checkedFindings.size > 0 || measurements.length > 0 || annotations.length > 0;
+
+  const generateReviewReport = () => {
+    setGenerateError(null);
+    try {
+      const output = buildReviewReport({
+        modality,
+        generatedAt: new Date(),
+        fileName: file?.name,
+        imageInfo: info ? { width: info.width, height: info.height, sizeBytes: file?.size } : undefined,
+        quality,
+        report,
+        findingStates: findingStatesForReport,
+        checklistSelections,
+        measurements: measurementsForReport,
+      });
+      setGeneratedReport(output);
+      setCopyFeedback(null);
+      window.setTimeout(() => document.getElementById("generated-review-report")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    } catch (error) {
+      setGeneratedReport(null);
+      setGenerateError(error instanceof Error ? error.message : "The review report could not be generated.");
+    }
+  };
+
+  const copyGeneratedReport = async () => {
+    if (!generatedReport) return;
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(generatedReport);
+      setCopyFeedback("copied");
+    } catch {
+      setCopyFeedback("failed");
+    }
+    window.setTimeout(() => setCopyFeedback(null), 2200);
+  };
+
+  const downloadGeneratedReport = () => {
+    if (!generatedReport) return;
+    const blob = new Blob([generatedReport], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "nephro-imaging-review-report.md";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const imagePropertyLabel = useMemo(() => info ? `${info.width.toLocaleString()} × ${info.height.toLocaleString()} px` : "Waiting for a local image", [info]);
-  const analysisBlocked = !imageDataUrl || !deidentifiedConfirmed || file?.size && file.size > MAX_ANALYSIS_FILE_BYTES || providerStatus === "unavailable" || analysisState === "loading";
+  const analysisBlocked = !imageDataUrl || !deidentifiedConfirmed || file?.size && file.size > MAX_ANALYSIS_FILE_BYTES || providerStatus === "unavailable" || analysisStage === "uploading" || analysisStage === "waiting";
+  const analysisInFlight = analysisStage === "uploading" || analysisStage === "waiting";
+  const canChat = Boolean(imageDataUrl && deidentifiedConfirmed);
 
   const isPhone = breakpoint === "phone";
   const isTablet = breakpoint === "tablet";
@@ -1237,13 +1440,12 @@ export default function ImagingWorkspace() {
   const accent = "var(--accent)";
   const accentMuted = (alpha: number) => `color-mix(in oklab, var(--accent) ${alpha}%, transparent)`;
 
-  const naturalWidth = info?.width ?? 1;
-  const naturalHeight = info?.height ?? 1;
   const hasAnnotations = annotations.length > 0;
   const hasMeasurements = measurements.length > 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-sans)" }}>
+    <>
+      <div className="no-print" style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-sans)" }}>
       {/* Header Section */}
       <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad} ${pagePad} 0` }}>
         <div style={{ marginBottom: isMobile ? "2rem" : "3rem" }}>
@@ -1510,11 +1712,11 @@ export default function ImagingWorkspace() {
           {analysisError && <div role="alert" style={{ padding: "0.75rem", backgroundColor: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: controlRadius, fontSize: "12px", color: "#dc2626", marginBottom: "1rem" }}>{analysisError}</div>}
 
           {/* Submit Button */}
-          <button type="button" disabled={Boolean(analysisBlocked)} onClick={requestAnalysis} aria-busy={analysisState === "loading"} style={{ width: "100%", padding: "0.75rem", backgroundColor: analysisBlocked ? accentMuted(30) : accent, color: "var(--accent-fg)", border: "none", borderRadius: controlRadius, fontSize: "14px", fontWeight: "600", cursor: analysisBlocked ? "not-allowed" : "pointer", opacity: analysisBlocked ? 0.55 : 1, display: "flex", alignItems: "center", gap: "0.75rem", justifyContent: "center", transition: "background-color 160ms ease, opacity 160ms ease", minHeight: "46px" }}>
-            {analysisState === "loading" ? (
+          <button type="button" disabled={Boolean(analysisBlocked)} onClick={requestAnalysis} aria-busy={analysisInFlight} style={{ width: "100%", padding: "0.75rem", backgroundColor: analysisBlocked ? accentMuted(30) : accent, color: "var(--accent-fg)", border: "none", borderRadius: controlRadius, fontSize: "14px", fontWeight: "600", cursor: analysisBlocked ? "not-allowed" : "pointer", opacity: analysisBlocked ? 0.55 : 1, display: "flex", alignItems: "center", gap: "0.75rem", justifyContent: "center", transition: "background-color 160ms ease, opacity 160ms ease", minHeight: "46px" }}>
+            {analysisInFlight ? (
               <>
                 <KidneyLoader size={26} ariaLabel="Reviewing" />
-                <span className="tabular-nums">{ANALYSIS_PHASES[phaseIndex]}…</span>
+                <span className="tabular-nums">{analysisStage === "uploading" ? "Uploading image…" : "Waiting for provider…"}</span>
               </>
             ) : (
               <>
@@ -1536,6 +1738,72 @@ export default function ImagingWorkspace() {
           <a href="https://www.cancerimagingarchive.net/access-data/" target="_blank" rel="noreferrer" style={{ fontSize: "13px", fontWeight: "600", color: accent, textDecoration: "none", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             Explore de-identified teaching data <Icon name="arrow" className="size-4" />
           </a>
+        </div>
+      </section>
+
+      {/* Ask about this image */}
+      <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem", borderTop: "1px solid var(--border)" }}>
+        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
+          <div style={{ marginBottom: "1.25rem" }}>
+            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Ask about this image</h6>
+            <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.5rem", letterSpacing: "-0.02em" }}>Questions answered against the loaded image.</h2>
+            <p style={{ fontSize: "12px", opacity: 0.75, lineHeight: 1.6, margin: 0 }}>
+              Sends the currently loaded image to the configured provider with your question, under the same de-identification consent as analysis. Answers are AI-assisted observations about the visible image only — not a diagnosis, radiology report, or treatment recommendation. Nothing is stored by Nephro.
+            </p>
+          </div>
+
+          {/* Message list */}
+          <div ref={chatListRef} style={{ maxHeight: "340px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.75rem", padding: "1rem", backgroundColor: "var(--surface-inset)", borderRadius: controlRadius, marginBottom: "1rem" }} role="log" aria-live="polite">
+            {chatMessages.length === 0 ? (
+              <p style={{ fontSize: "12px", opacity: 0.65, margin: 0 }}>No questions yet. Try a suggested question or type your own.</p>
+            ) : chatMessages.map((message, index) => (
+              message.role === "user" ? (
+                <div key={index} style={{ alignSelf: "flex-end", maxWidth: "85%", padding: "0.6rem 0.85rem", borderRadius: controlRadius, backgroundColor: accent, color: "var(--accent-fg)", fontSize: "13px", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{message.text}</div>
+              ) : (
+                <div key={index} style={{ alignSelf: "flex-start", maxWidth: "85%" }}>
+                  <div style={{ padding: "0.6rem 0.85rem", borderRadius: controlRadius, backgroundColor: "var(--surface-raised)", border: "1px solid var(--border)", fontSize: "13px", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{message.text}</div>
+                  {message.meta && <p style={{ fontSize: "10px", fontFamily: "var(--font-mono)", opacity: 0.55, margin: "0.35rem 0 0" }}>{message.meta}</p>}
+                </div>
+              )
+            ))}
+            {chatStatus === "waiting" && (
+              <div style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.6rem 0.85rem", borderRadius: controlRadius, backgroundColor: "var(--surface-raised)", border: "1px solid var(--border)" }}>
+                <KidneyLoader size={18} ariaLabel="Answering" />
+                <span style={{ fontSize: "12px", opacity: 0.7 }}>Waiting for the provider&apos;s answer…</span>
+              </div>
+            )}
+          </div>
+
+          {chatError && <div role="alert" style={{ padding: "0.75rem", backgroundColor: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: controlRadius, fontSize: "12px", color: "#dc2626", marginBottom: "0.75rem" }}>{chatError}</div>}
+
+          {/* Suggested questions */}
+          {chatStatus !== "waiting" && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              {SUGGESTED_QUESTIONS.map((question) => (
+                <button key={question} type="button" onClick={() => sendChatQuestion(question)} disabled={!canChat} className="pressable" style={{ padding: "0.35rem 0.7rem", fontSize: "11px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "999px", cursor: canChat ? "pointer" : "not-allowed", opacity: canChat ? 0.9 : 0.45, transition: "border-color 140ms ease, opacity 140ms ease" }}>{question}</button>
+              ))}
+            </div>
+          )}
+
+          {/* Input row */}
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "stretch" }}>
+            <input
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); sendChatQuestion(chatInput); } }}
+              placeholder="Ask about the visible image…"
+              maxLength={600}
+              disabled={chatStatus === "waiting" || !canChat}
+              aria-label="Question about the image"
+              style={{ flex: 1, minWidth: 0, padding: "0.7rem 0.85rem", border: "1px solid var(--border)", borderRadius: controlRadius, backgroundColor: "var(--surface-raised)", color: "var(--text)", fontSize: "13px", fontFamily: "inherit", transition: "border-color 140ms ease" }}
+            />
+            <button type="button" onClick={() => sendChatQuestion(chatInput)} disabled={chatStatus === "waiting" || !canChat || !chatInput.trim()} aria-label="Send question" className="pressable" style={{ padding: "0 1.1rem", backgroundColor: canChat ? accent : accentMuted(30), color: "var(--accent-fg)", border: "none", borderRadius: controlRadius, cursor: canChat && chatInput.trim() ? "pointer" : "not-allowed", opacity: canChat ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center", transition: "background-color 140ms ease, opacity 140ms ease" }}>
+              <Icon name="arrow" className="size-4" />
+            </button>
+          </div>
+          {!deidentifiedConfirmed && imageDataUrl && (
+            <p style={{ fontSize: "11px", opacity: 0.65, margin: "0.5rem 0 0" }}>Confirm the de-identification checkbox in the AI review card to enable questions.</p>
+          )}
         </div>
       </section>
 
@@ -1611,6 +1879,47 @@ export default function ImagingWorkspace() {
               <h2 style={{ fontSize: "22px", fontWeight: "bold", margin: "0.5rem 0 0", letterSpacing: "-0.02em" }}>Report output</h2>
             </div>
 
+            {/* Structured findings review */}
+            {report.observedVisualFeatures.length > 0 && (
+              <div style={{ marginBottom: "1.5rem", paddingBottom: "1.5rem", borderBottom: "1px solid", borderColor: accentMuted(20) }}>
+                <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Structured findings review</h6>
+                <p style={{ fontSize: "12px", opacity: 0.7, lineHeight: 1.6, margin: "0 0 1rem" }}>
+                  Review each observation the AI listed. Your decisions feed the generated review report. The AI does not rate its own confidence, so features start as Not rated.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {report.observedVisualFeatures.map((feature, index) => {
+                    const state = findingStates[index] ?? { status: "pending" as const, text: feature };
+                    const isEditing = editingIndex === index;
+                    return (
+                      <div key={`${index}-${feature}`} style={{ borderRadius: controlRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: "0.75rem" }}>
+                        {isEditing ? (
+                          <>
+                            <textarea value={editText} onChange={(event) => setEditText(event.target.value)} maxLength={600} autoFocus aria-label={`Edit finding ${index + 1}`} style={{ width: "100%", minHeight: "64px", padding: "0.6rem", border: "1px solid var(--border)", borderRadius: "calc(var(--radius-base) - 6px)", backgroundColor: "var(--surface-raised)", color: "var(--text)", fontSize: "13px", fontFamily: "inherit", resize: "vertical" }} />
+                            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                              <MiniButton label="Save" onClick={() => saveEditedFinding(index)} tone="accent" />
+                              <MiniButton label="Cancel" onClick={cancelEditingFinding} />
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap" }}>
+                            <p style={{ flex: "1 1 260px", fontSize: "13px", lineHeight: 1.5, margin: "0.25rem 0 0", ...(state.status === "rejected" ? { textDecoration: "line-through", opacity: 0.6 } : {}) }}>
+                              {state.status === "edited" ? state.text : feature}
+                            </p>
+                            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexShrink: 0 }}>
+                              <FindingChip status={state.status} />
+                              <MiniButton label="Confirm" onClick={() => setFindingStatus(index, "confirmed", feature)} />
+                              <MiniButton label="Edit" onClick={() => startEditingFinding(index, state.status === "edited" ? state.text : feature)} />
+                              <MiniButton label="Reject" onClick={() => setFindingStatus(index, "rejected", feature)} tone="danger" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "2rem", marginBottom: "1.5rem" }}>
               <div>
                 <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 1rem" }}>Summary</h6>
@@ -1649,6 +1958,53 @@ export default function ImagingWorkspace() {
           </div>
         </section>
       )}
-    </div>
+
+      {/* Generate review report */}
+      <section style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem", borderTop: "1px solid var(--border)" }}>
+        <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
+          <div style={{ marginBottom: "1.25rem" }}>
+            <h6 style={{ fontSize: "12px", fontWeight: "600", letterSpacing: "0.1em", color: accent, textTransform: "uppercase", margin: "0 0 0.5rem" }}>Review report</h6>
+            <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 0.5rem", letterSpacing: "-0.02em" }}>Generate a review document from the current workspace.</h2>
+            <p style={{ fontSize: "12px", opacity: 0.75, lineHeight: 1.6, margin: 0 }}>
+              Combines the AI report with your confirmed / edited / rejected findings, checklist selections, pixel measurements and technical quality metrics, plus the AI-assistance notice. A working document for review by a qualified clinician — not a diagnosis.
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+            <button type="button" onClick={generateReviewReport} disabled={!canGenerateReport} className="pressable" style={{ padding: "0.7rem 1.1rem", backgroundColor: canGenerateReport ? accent : accentMuted(30), color: "var(--accent-fg)", border: "none", borderRadius: controlRadius, fontSize: "13px", fontWeight: "600", cursor: canGenerateReport ? "pointer" : "not-allowed", opacity: canGenerateReport ? 1 : 0.55, display: "flex", alignItems: "center", gap: "0.5rem", transition: "background-color 140ms ease, opacity 140ms ease" }}>
+              <Icon name="scan" className="size-4" />Generate review report
+            </button>
+            {!canGenerateReport && <p style={{ fontSize: "11px", opacity: 0.6, margin: 0 }}>Needs an AI report, checklist selections, or measurements/annotations.</p>}
+          </div>
+          {generateError && <div role="alert" style={{ padding: "0.75rem", backgroundColor: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: controlRadius, fontSize: "12px", color: "#dc2626", marginTop: "0.75rem" }}>{generateError}</div>}
+        </div>
+      </section>
+      </div>
+
+      {/* Printable review report (outside the no-print chrome) */}
+      {generatedReport && (
+        <section id="generated-review-report" aria-label="Generated review report" style={{ maxWidth: "1180px", margin: "0 auto", padding: `${pagePad}`, marginTop: isMobile ? "2rem" : "3rem" }}>
+          <div style={{ borderRadius: cardRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface)", padding: isMobile ? "1.5rem" : "2rem", boxShadow: "var(--shadow-card)" }}>
+            <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600" }}>Review report (Markdown)</span>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button type="button" onClick={copyGeneratedReport} className="pressable" style={{ padding: "0.5rem 0.8rem", fontSize: "12px", fontWeight: "600", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem", transition: "border-color 140ms ease" }}>
+                  <Icon name="copy" className="size-3.5" />{copyFeedback === "copied" ? "Copied" : copyFeedback === "failed" ? "Copy failed" : "Copy"}
+                </button>
+                <button type="button" onClick={downloadGeneratedReport} className="pressable" style={{ padding: "0.5rem 0.8rem", fontSize: "12px", fontWeight: "600", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem", transition: "border-color 140ms ease" }}>
+                  <Icon name="download" className="size-3.5" />Download .md
+                </button>
+                <button type="button" onClick={() => window.print()} className="pressable" style={{ padding: "0.5rem 0.8rem", fontSize: "12px", fontWeight: "600", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem", transition: "border-color 140ms ease" }}>
+                  <Icon name="printer" className="size-3.5" />Print
+                </button>
+              </div>
+            </div>
+            <div style={{ borderRadius: "calc(var(--radius-base) - 2px)", border: "1px solid var(--border)", backgroundColor: "var(--surface-inset)" }}>
+              <pre style={{ margin: 0, padding: "1rem", fontSize: "12.5px", lineHeight: 1.6, fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text)" }}>{generatedReport}</pre>
+            </div>
+            <p style={{ fontSize: "11px", opacity: 0.6, margin: "0.75rem 0 0" }}>Generated locally in your browser from the current workspace state. Markdown with the AI-assistance notice — not a diagnosis.</p>
+          </div>
+        </section>
+      )}
+    </>
   );
 }

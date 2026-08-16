@@ -54,7 +54,7 @@ export default function SplashGate() {
 
   return (
     <div
-      className={`splash-overlay fixed inset-0 z-[100] flex flex-col items-center justify-center ${
+      className={`splash-overlay no-print fixed inset-0 z-[100] flex flex-col items-center justify-center ${
         phase === "exiting" ? "splash-exit" : ""
       }`}
       style={{

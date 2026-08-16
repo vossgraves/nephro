@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { KdigoHeatmap } from "@/components/KdigoHeatmap";
 import { Card, Field, InputGroup, inputClass, unitSelectClass } from "@/components/Field";
 import { saveRecord } from "@/app/records/actions";
@@ -75,6 +75,22 @@ function loadJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Announces only the no-results -> results transition to screen readers
+ * (aria-live on the whole panel would chatter on every keystroke).
+ */
+function ResultsAnnouncer({ hasResults }: { hasResults: boolean }) {
+  const [announcement, setAnnouncement] = useState("");
+  const hadResults = useRef(false);
+  useEffect(() => {
+    if (hasResults && !hadResults.current) {
+      setAnnouncement("Results are now available below the form.");
+    }
+    hadResults.current = hasResults;
+  }, [hasResults]);
+  return <p role="status" className="sr-only">{announcement}</p>;
 }
 
 export default function CalculatorPage() {
@@ -296,6 +312,7 @@ export default function CalculatorPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+        <div className="no-print">
         <Card title="Patient & labs" description="Age, sex, serum creatinine, urine ACR.">
           <form
             className="space-y-4"
@@ -469,12 +486,13 @@ export default function CalculatorPage() {
             <button
               type="submit"
               disabled={!r || saving}
-              className="w-full rounded-[var(--radius-base)] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="w-full rounded-[var(--radius-base)] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save to records"}
             </button>
             {saveMsg ? (
               <p
+                role="status"
                 className={`text-xs ${saveMsg.includes("Saved") ? "text-emerald-700 dark:text-emerald-300" : "text-muted"}`}
               >
                 {saveMsg}
@@ -482,12 +500,14 @@ export default function CalculatorPage() {
             ) : null}
           </form>
         </Card>
+        </div>
 
         <div className="space-y-6">
           <Card
             title="Results"
             description="All values recomputed live from the inputs above — nothing is randomized."
           >
+            <ResultsAnnouncer hasResults={Boolean(r)} />
             {!r ? (
               <p className="text-sm text-muted">
                 {hasErrors

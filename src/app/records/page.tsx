@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { isDbConfigured, listRecords, type RecordRow } from "@/lib/db";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { removeRecord } from "./actions";
 
 function exportCsv(records: RecordRow[]) {
@@ -118,13 +119,7 @@ export default async function RecordsPage() {
                         await removeRecord(rec.id);
                       }}
                     >
-                      <button
-                        type="submit"
-                        aria-label={`Delete record for ${rec.patient_name}`}
-                        className="rounded-[var(--radius-base)] border border-border px-2.5 py-1 text-xs text-muted transition-colors hover:border-red-500/50 hover:text-red-600"
-                      >
-                        Delete
-                      </button>
+                      <ConfirmDeleteButton patientName={rec.patient_name} />
                     </form>
                   </td>
                 </tr>

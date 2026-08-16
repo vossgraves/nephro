@@ -33,14 +33,18 @@ type TimeoutSignal = { signal: AbortSignal; dispose: () => void };
 function signalWithTimeout(caller?: AbortSignal): TimeoutSignal {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+  const onCallerAbort = () => controller.abort();
   if (caller?.aborted) {
     controller.abort();
   } else {
-    caller?.addEventListener("abort", () => controller.abort(), { once: true });
+    caller?.addEventListener("abort", onCallerAbort, { once: true });
   }
   return {
     signal: controller.signal,
-    dispose: () => clearTimeout(timer),
+    dispose: () => {
+      clearTimeout(timer);
+      caller?.removeEventListener("abort", onCallerAbort);
+    },
   };
 }
 
@@ -108,16 +112,21 @@ export class GeminiProvider implements VisionProvider {
         signal: timeout.signal,
       });
     } catch (error) {
-      throw errorFromFetch(this.name, error);
-    } finally {
       timeout.dispose();
+      throw errorFromFetch(this.name, error);
     }
     if (!response.ok) {
+      // Status only: the provider error body is never read, logged, or surfaced.
+      timeout.dispose();
       throw new ProviderError(this.name, kindForStatus(response.status), `The ${this.name} provider rejected the request.`, response.status);
     }
     try {
-      return (await response.json()) as unknown;
+      const data = (await response.json()) as unknown;
+      // Timeout covered the full request + body read; only now dispose it.
+      timeout.dispose();
+      return data;
     } catch {
+      timeout.dispose();
       throw new ProviderError(this.name, "invalid-response", "The provider returned an unreadable body.");
     }
   }

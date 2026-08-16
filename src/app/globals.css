@@ -8,7 +8,7 @@
   --border: oklch(0.9 0.008 250);
   --border-strong: oklch(0.8 0.014 250);
   --text: oklch(0.22 0.012 250);
-  --muted: oklch(0.49 0.013 250);
+  --muted: oklch(0.45 0.013 250);
   --primary: oklch(0.26 0.016 250);
   --primary-fg: oklch(0.99 0 0);
   --accent: oklch(0.63 0.15 46);
