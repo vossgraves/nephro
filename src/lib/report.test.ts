@@ -97,7 +97,7 @@ Overall technical score: 87/100
 - Single slice view
 - No volumetric data
 
-## Checklist selection
+## Checklist selections
 - Enhancing soft-tissue nodule or irregular thickening (≥4 mm)
 - Multiple (≥4) septa or minimally thickened smooth walls/septa
 
@@ -114,7 +114,7 @@ assert.equal(buildReviewReport(FULL), FULL_SNAPSHOT, "full input must match the 
 
 /* ---- section order in the full report ------------------------------------- */
 const fullOut = buildReviewReport(FULL);
-const order = ["## Technical image-quality metrics — not clinical measurements", "## AI visual review", "## Limitations", "## Checklist selection", "## Measurements (pixels)", "---"];
+const order = ["## Technical image-quality metrics — not clinical measurements", "## AI visual review", "## Limitations", "## Checklist selections", "## Measurements (pixels)", "---"];
 let cursor = 0;
 for (const heading of order) {
   const idx = fullOut.indexOf(heading);
@@ -136,7 +136,7 @@ This report is not a diagnosis.`;
 
 const minimalOut = buildReviewReport(MINIMAL);
 assert.equal(minimalOut, MINIMAL_SNAPSHOT, "no report/quality -> header + notice only");
-for (const absent of ["Technical image-quality metrics", "AI visual review", "Limitations", "Checklist selection", "Measurements (pixels)"]) {
+for (const absent of ["Technical image-quality metrics", "AI visual review", "Limitations", "Checklist selections", "Measurements (pixels)"]) {
   assert.ok(!minimalOut.includes(absent), `"${absent}" must be omitted when there is no data`);
 }
 
@@ -165,7 +165,7 @@ const emptyOut = buildReviewReport(EMPTY_REPORT);
 assert.ok(emptyOut.includes("# Imaging Review Report"), "header always present");
 assert.ok(emptyOut.includes("- **Modality:** Other exported image"));
 assert.ok(emptyOut.includes("*" + CANONICAL_SAFETY_NOTE + "*"), "empty report falls back to canonical notice");
-for (const absent of ["Technical image-quality metrics", "AI visual review", "Limitations", "Checklist selection", "Measurements (pixels)", "**Summary:**"]) {
+for (const absent of ["Technical image-quality metrics", "AI visual review", "Limitations", "Checklist selections", "Measurements (pixels)", "**Summary:**"]) {
   assert.ok(!emptyOut.includes(absent), `"${absent}" must be omitted for an empty report`);
 }
 

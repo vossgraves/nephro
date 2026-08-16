@@ -11,14 +11,14 @@
   --muted: oklch(0.45 0.013 250);
   --primary: oklch(0.26 0.016 250);
   --primary-fg: oklch(0.99 0 0);
-  --accent: oklch(0.63 0.15 46);
-  --accent-strong: oklch(0.56 0.15 44);
+  --accent: oklch(0.52 0.14 46);
+  --accent-strong: oklch(0.48 0.13 44);
   --accent-soft: oklch(0.95 0.035 55);
   --accent-fg: oklch(0.995 0 0);
   --low: oklch(0.78 0.04 150);
   --moderate: oklch(0.84 0.08 88);
   --high: oklch(0.72 0.12 56);
-  --very-high: oklch(0.6 0.16 28);
+  --very-high: oklch(0.5 0.15 28);
   --radius: 0.75rem;
   --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);

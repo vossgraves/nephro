@@ -5,7 +5,7 @@ import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import * as THREE from "three";
 import { getPerfConfig, PARTICLE_CAP, type PerfConfig } from "@/components/hero/perf-tier";
 
-const POSTER_SRC = "/media/nephro-kidney-tablet-desktop-poster.png";
+const POSTER_SRC = "/media/nephro-kidney-tablet-desktop-poster.webp";
 
 const TEAL = new THREE.Color("#a8441c");
 const GREEN = new THREE.Color("#d97b45");

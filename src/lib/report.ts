@@ -172,7 +172,7 @@ export function buildReviewReport(input: ReportInput): string {
 
   const checklist = (input.checklistSelections ?? []).map((c) => c.trim()).filter((c) => c.length > 0);
   if (checklist.length > 0) {
-    blocks.push(`## Checklist selection\n${checklist.map((c) => `- ${c}`).join("\n")}`);
+    blocks.push(`## Checklist selections\n${checklist.map((c) => `- ${c}`).join("\n")}`);
   }
 
   const measurements = (input.measurements ?? []).filter((m) => m.label.trim().length > 0);

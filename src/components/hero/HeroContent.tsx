@@ -72,6 +72,7 @@ export default function HeroContent({ stats }: { stats: readonly HeroStat[] }) {
         <div
           className="hero-reveal mt-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 lg:justify-start"
           style={{ "--i": 4 } as React.CSSProperties}
+          role="group"
           aria-label="Three live calculation signals represented in the visualization"
         >
           <span className="text-slate-400">Live signals</span>

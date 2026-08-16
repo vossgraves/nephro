@@ -24,9 +24,9 @@ export default function HeroVideo() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <picture className={`absolute inset-0 ${motionEnabled ? "md:hidden" : ""}`}>
-        <source media="(max-width: 767px)" srcSet="/media/nephro-kidney-tablet-mobile-poster.png" />
+        <source media="(max-width: 767px)" srcSet="/media/nephro-kidney-tablet-mobile-poster.webp" />
         <img
-          src="/media/nephro-kidney-tablet-desktop-poster.png"
+          src="/media/nephro-kidney-tablet-desktop-poster.webp"
           alt=""
           className="h-full w-full object-cover object-[62%_center] md:object-center"
         />
@@ -40,7 +40,7 @@ export default function HeroVideo() {
           loop
           playsInline
           preload="metadata"
-          poster="/media/nephro-kidney-tablet-desktop-poster.png"
+          poster="/media/nephro-kidney-tablet-desktop-poster.webp"
           onError={() => setMotionEnabled(false)}
         >
           <source src="/media/nephro-kidney-tablet-desktop.mp4" type="video/mp4" />

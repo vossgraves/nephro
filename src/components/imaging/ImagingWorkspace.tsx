@@ -635,6 +635,26 @@ function measurementSummary(measurement: Measurement, width: number, height: num
   return `ROI ${formatPixelArea(rectAreaPixels(measurement.corner, measurement.opposite, width, height))}`;
 }
 
+type RouteErrorBody = { error?: string; code?: string };
+
+/**
+ * Map the imaging routes' { error, code } shapes (analyze + chat) to distinct,
+ * understandable user-facing messages. Status is used as a fallback when the
+ * response body is missing or the code is absent.
+ */
+function routeErrorMessage(status: number, body: RouteErrorBody | null, fallback: string): string {
+  if (body?.code === "RATE_LIMITED" || status === 429) {
+    return "Too many requests. Please wait about a minute and try again.";
+  }
+  if (body?.code === "PAYLOAD_TOO_LARGE" || status === 413) {
+    return "The image is too large for provider review. Choose an image smaller than 4 MB and try again.";
+  }
+  if (body?.error) return body.error;
+  if (status === 503) return "No AI provider could complete the request. Try again later.";
+  if (status === 400 || status === 422) return "The request was not accepted. Check your inputs and try again.";
+  return fallback;
+}
+
 export default function ImagingWorkspace() {
   const inputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1266,8 +1286,8 @@ export default function ImagingWorkspace() {
       });
       // Headers arrived: the image has been uploaded. The provider is now processing.
       setAnalysisStage("waiting");
-      const data = await response.json() as { report?: RecognitionReport; error?: string };
-      if (!response.ok || !data.report) throw new Error(data.error || "Analysis failed. Please try again.");
+      const data = await response.json() as { report?: RecognitionReport; error?: string; code?: string };
+      if (!response.ok || !data.report) throw new Error(routeErrorMessage(response.status, data, "Analysis failed. Please try again."));
       setReport(data.report);
       setAnalysisStage("done");
     } catch (error) {
@@ -1298,9 +1318,9 @@ export default function ImagingWorkspace() {
           priorReport: report ?? undefined,
         }),
       });
-      const data = await response.json() as { answer?: string; provider?: RecognitionProvider; model?: string; error?: string };
+      const data = await response.json() as { answer?: string; provider?: RecognitionProvider; model?: string; error?: string; code?: string };
       const answer = data.answer;
-      if (!response.ok || typeof answer !== "string") throw new Error(data.error || "The provider did not return an answer. Please try again.");
+      if (!response.ok || typeof answer !== "string") throw new Error(routeErrorMessage(response.status, data, "The provider did not return an answer. Please try again."));
       const meta = data.provider && data.model ? `${providerLabel[data.provider]} · ${data.model}` : undefined;
       setChatMessages((current) => [...current, { role: "assistant", text: answer, meta }]);
       setChatStatus("idle");
