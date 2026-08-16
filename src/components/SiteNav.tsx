@@ -81,10 +81,7 @@ export default function SiteNav() {
       className="min-w-0 max-w-full overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
     >
-      <div
-        ref={content}
-        className="flex w-max items-center gap-1 rounded-[calc(var(--radius-base)+2px)] border border-slate-200/80 bg-slate-50/75 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
-      >
+      <div ref={content} className="flex w-max items-stretch">
         {LINKS.map((link) => {
           const current = isCurrent(pathname, link.href);
           return (
@@ -92,13 +89,18 @@ export default function SiteNav() {
               key={link.href}
               href={link.href}
               aria-current={current ? "page" : undefined}
-              className={`pressable rounded-[calc(var(--radius-base)-2px)] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.01em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:px-3 sm:text-sm ${
-                current
-                  ? "bg-white text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
-                  : "text-slate-500 hover:bg-white/75 hover:text-slate-900"
+              className={`pressable relative flex items-center px-3 py-2 text-[11px] font-semibold tracking-[-0.01em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:px-3.5 sm:text-[13px] ${
+                current ? "text-text" : "text-muted hover:text-text"
               }`}
             >
               {link.label}
+              {/* Hairline underline indicator — accent, 2px, animated on route change */}
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none absolute inset-x-3 bottom-0 h-0.5 origin-left rounded-full bg-accent transition-transform duration-300 ease-out ${
+                  current ? "scale-x-100" : "scale-x-0"
+                }`}
+              />
             </Link>
           );
         })}

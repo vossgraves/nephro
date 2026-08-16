@@ -32,7 +32,21 @@ function ToolStat({ label, value, unit, sub }: { label: string; value: string; u
 }
 
 function SectionIntro({ children }: { children: React.ReactNode }) {
-  return <p className="mt-1 text-sm leading-relaxed text-muted text-pretty">{children}</p>;
+  return (
+    <p
+      className="text-pretty"
+      style={{
+        margin: 0,
+        maxWidth: "62ch",
+        fontSize: "15px",
+        lineHeight: 1.55,
+        letterSpacing: "-0.01em",
+        color: "var(--muted)",
+      }}
+    >
+      {children}
+    </p>
+  );
 }
 
 /* -------------------------------------------------------- ACR tool ----- */
@@ -430,7 +444,45 @@ export default function ToolsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Clinical toolbox</h1>
+        <p
+          className="eyebrow"
+          style={{
+            margin: 0,
+            fontFamily: "var(--font-mono)",
+            fontSize: "11px",
+            fontWeight: 600,
+            letterSpacing: "0.2em",
+            lineHeight: 1.4,
+            textTransform: "uppercase",
+            color: "var(--accent)",
+          }}
+        >
+          Clinical utilities
+        </p>
+        <h1
+          className="display-1 text-balance"
+          style={{
+            margin: "0.875rem 0 0",
+            fontSize: "clamp(2rem, 4.5vw, 3.25rem)",
+            lineHeight: 1.05,
+            letterSpacing: "-0.03em",
+            fontWeight: 700,
+            color: "var(--text)",
+            textWrap: "balance",
+          }}
+        >
+          Clinical toolbox
+        </h1>
+        <div
+          className="rule"
+          aria-hidden="true"
+          style={{
+            height: "1px",
+            margin: "1.5rem 0 1.25rem",
+            background: "var(--border-strong)",
+            border: 0,
+          }}
+        />
         <SectionIntro>
           Quick, published-equation tools for everyday kidney workup — spot urine ACR, anion gap,
           calcium correction, iron status, sodium correction, FENa, and eGFR-based dosing. Every

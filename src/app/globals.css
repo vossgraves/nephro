@@ -332,3 +332,86 @@ html.simple-mode :focus-visible {
     color: #000;
   }
 }
+
+/* =========================================================================
+   Clinical editorial system — chrome refresh (additive, 2026-08-16)
+   -------------------------------------------------------------------------
+   Opt-in utilities introduced with the landing remake. Existing tokens and
+   classes are untouched; nothing here applies styles unless a component
+   opts in by class name. All color values reuse the verified AA tokens.
+   ========================================================================= */
+
+/* --- Display type: fluid clamp sizes, tight editorial tracking ---------- */
+
+.display-1,
+.display-2 {
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.display-1 {
+  font-size: clamp(2.5rem, 5.2vw + 0.6rem, 5.5rem); /* 40px → 88px */
+}
+
+.display-2 {
+  font-size: clamp(2rem, 3.4vw + 0.7rem, 3.5rem); /* 32px → 56px */
+}
+
+/* --- Eyebrow micro-label: mono, uppercase, wide tracking, accent -------- */
+
+.eyebrow {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  text-wrap: pretty;
+  color: var(--accent); /* 5.61:1 on --bg — AA pass for small text */
+}
+
+/* --- Hairline rules ------------------------------------------------------ */
+
+.rule {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--border-strong) 22%, var(--border) 78%, transparent);
+}
+
+.rule-accent {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--accent) 70%, var(--border)) 50%, transparent);
+}
+
+/* --- Section spacing scale ---------------------------------------------- */
+
+.section-space {
+  padding-block: clamp(4rem, 8vw, 7rem);
+}
+
+.section-space-sm {
+  padding-block: clamp(2.75rem, 5vw, 4.25rem);
+}
+
+.section-space-lg {
+  padding-block: clamp(5.5rem, 11vw, 9.5rem);
+}
+
+/* --- Page container ------------------------------------------------------ */
+
+.container-page {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-page {
+    padding-inline: 1.5rem;
+  }
+}

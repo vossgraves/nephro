@@ -39,10 +39,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
         <SplashGate />
-        <header className="no-print sticky top-0 z-40 border-b border-border/80 bg-surface/80 backdrop-blur-xl">
-          <div className="mx-auto max-w-6xl px-4 py-3 sm:flex sm:items-center sm:gap-6 sm:px-6">
+        <header className="no-print sticky top-0 z-40 border-b border-border/60 bg-surface/80 backdrop-blur-xl after:pointer-events-none after:absolute after:inset-x-0 after:-bottom-px after:h-px after:content-[''] after:bg-[linear-gradient(90deg,transparent,var(--border-strong)_22%,var(--border)_78%,transparent)]">
+          <div className="mx-auto max-w-6xl px-4 py-2.5 sm:flex sm:items-center sm:gap-6 sm:px-6">
             <div className="flex items-center">
-              <Link href="/" className="pressable flex shrink-0 items-center gap-2.5 font-semibold tracking-[-0.03em] text-slate-950">
+              <Link href="/" className="pressable flex shrink-0 items-center gap-2.5 font-semibold tracking-[-0.04em] text-slate-950">
                 <span className="grid size-7 place-items-center rounded-[9px] bg-slate-950 text-white shadow-sm shadow-slate-900/20">
                   <svg
                     viewBox="0 0 24 24"
@@ -59,12 +59,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span className="hidden sm:inline">Renal Function</span>
                 <span className="sm:hidden">Nephro</span>
               </Link>
-              <div className="ml-auto hidden items-center gap-2 sm:flex">
+              <div className="ml-auto hidden items-center gap-3 sm:flex">
                 <SiteNav />
                 <SimpleModeToggle />
               </div>
             </div>
-            <div className="mt-2 flex items-center gap-2 sm:hidden">
+            <div className="mt-2 flex items-center gap-3 sm:hidden">
               <div className="min-w-0 flex-1">
                 <SiteNav />
               </div>
@@ -76,11 +76,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10">{children}</main>
 
         <footer className="no-print border-t border-border bg-surface/80">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs leading-relaxed text-muted sm:px-6 md:flex-row md:items-start md:justify-between">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-xs leading-relaxed text-muted sm:px-6 md:flex-row md:items-start md:justify-between md:gap-10">
             <p className="max-w-3xl text-pretty">
               <strong className="font-semibold text-text">Not a medical device.</strong> This tool implements published equations exactly as specified and shows its working. It does not diagnose, and it does not replace clinical judgement. Every result must be interpreted by a qualified clinician in the context of the individual patient.
             </p>
-            <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">Published equations · Visible working</p>
+            <p className="shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Published equations · Visible working</p>
           </div>
         </footer>
       </body>
