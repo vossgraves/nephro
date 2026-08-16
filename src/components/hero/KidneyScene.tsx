@@ -4,6 +4,12 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
 import { getPerfConfig, PARTICLE_CAP, type PerfConfig } from "@/components/hero/perf-tier";
+import {
+  CHOREO_RIGS,
+  choreoBus,
+  sampleChoreo,
+  useReducedMotion,
+} from "@/components/hero/scroll-choreography";
 
 const POSTER_SRC = "/media/nephro-kidney-tablet-desktop-poster.webp";
 
@@ -99,13 +105,15 @@ const FRAGMENT = /* glsl */ `
 
 const PARTICLE_VERT = /* glsl */ `
   uniform float uTime;
+  uniform float uCalm;
   attribute float aPhase;
   varying float vAlpha;
 
   void main() {
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = (2.1 + sin(uTime * 2.0 + aPhase) * 1.2) * (6.0 / -mvPosition.z);
-    vAlpha = 0.44 + 0.15 * sin(uTime * 2.0 + aPhase * 2.0);
+    float pulse = 1.0 - uCalm * 0.8;
+    gl_PointSize = (2.1 + sin(uTime * 2.0 + aPhase) * 1.2 * pulse) * (6.0 / -mvPosition.z);
+    vAlpha = 0.44 + 0.15 * sin(uTime * 2.0 + aPhase * 2.0) * pulse;
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -126,20 +134,8 @@ const RIPPLE_RADIUS = 1.5;
 const RIPPLE_STRENGTH = 3.0;
 const RIPPLE_SPRING = 12;
 const RIPPLE_DAMPING = 2.5;
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return reduced;
-}
+/** Radius of the invisible sphere the pointer is projected onto. */
+const POINTER_PROBE_RADIUS = 3.8;
 
 /**
  * three r163+ is WebGL2-only, so the probe requires a WebGL2 context. Any
@@ -189,6 +185,98 @@ function PosterFrame() {
   );
 }
 
+/**
+ * Damped camera rig driven by the scroll choreography bus. Blends the hero /
+ * signals / process / cta rigs, adds a slow idle orbit and a subtle pointer
+ * parallax, and owns the window-level pointer tracking that feeds both the
+ * parallax and the particle ripple (the backdrop canvas ignores pointer
+ * events so the page underneath stays fully scrollable).
+ */
+function ChoreographyRig({ reduced }: { reduced: boolean }) {
+  const camera = useThree((state) => state.camera) as THREE.PerspectiveCamera;
+
+  const smoothed = useRef({
+    pos: new THREE.Vector3(...CHOREO_RIGS[0].position),
+    look: new THREE.Vector3(...CHOREO_RIGS[0].lookAt),
+    drift: 0,
+  });
+  const raycaster = useRef(new THREE.Raycaster());
+  const probe = useRef(new THREE.Sphere(new THREE.Vector3(), POINTER_PROBE_RADIUS));
+  const targetPos = useRef(new THREE.Vector3());
+  const targetLook = useRef(new THREE.Vector3());
+
+  useEffect(() => {
+    if (reduced) return;
+
+    const raycasterRef = raycaster.current;
+    const probeRef = probe.current;
+
+    const project = () => {
+      const ndc = new THREE.Vector2(choreoBus.pointerX, choreoBus.pointerY);
+      raycasterRef.setFromCamera(ndc, camera);
+      return raycasterRef.ray.intersectSphere(probeRef, choreoBus.pointerWorld) !== null;
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      choreoBus.down = true;
+      project();
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      choreoBus.pointerX = (event.clientX / window.innerWidth) * 2 - 1;
+      choreoBus.pointerY = -(event.clientY / window.innerHeight) * 2 + 1;
+      if (choreoBus.down) project();
+    };
+    const onPointerEnd = () => {
+      choreoBus.down = false;
+    };
+
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerEnd);
+    window.addEventListener("pointercancel", onPointerEnd);
+    window.addEventListener("blur", onPointerEnd);
+    return () => {
+      choreoBus.down = false;
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerEnd);
+      window.removeEventListener("pointercancel", onPointerEnd);
+      window.removeEventListener("blur", onPointerEnd);
+    };
+  }, [camera, reduced]);
+
+  useFrame((state, delta) => {
+    const progress = reduced ? 0 : choreoBus.progress;
+    const sample = sampleChoreo(progress);
+
+    targetPos.current.set(sample.position[0], sample.position[1], sample.position[2]);
+    targetLook.current.set(sample.lookAt[0], sample.lookAt[1], sample.lookAt[2]);
+    if (!reduced) {
+      targetPos.current.x += choreoBus.pointerX * 0.22;
+      targetPos.current.y += choreoBus.pointerY * 0.14;
+    }
+
+    const smoothing = 1 - Math.exp(-(reduced ? 4 : 2.4) * delta);
+    smoothed.current.pos.lerp(targetPos.current, smoothing);
+    smoothed.current.look.lerp(targetLook.current, smoothing);
+    smoothed.current.drift += (sample.drift - smoothed.current.drift) * smoothing;
+
+    const t = state.clock.elapsedTime;
+    const drift = reduced ? 0 : smoothed.current.drift;
+    camera.position.set(
+      smoothed.current.pos.x + Math.sin(t * 0.51) * drift,
+      smoothed.current.pos.y + Math.cos(t * 0.37) * drift * 0.72,
+      smoothed.current.pos.z + Math.sin(t * 0.23) * drift * 0.34,
+    );
+    camera.lookAt(smoothed.current.look);
+
+    choreoBus.calm = reduced ? 1 : sample.calm;
+  });
+
+  return null;
+}
+
 function KidneyCore({ reduced, animateFresnel }: { reduced: boolean; animateFresnel: boolean }) {
   const mesh = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
@@ -215,8 +303,8 @@ function KidneyCore({ reduced, animateFresnel }: { reduced: boolean; animateFres
 
     const smoothing = 1 - Math.exp(-4 * delta);
     spin.current += delta * 0.14;
-    follow.current.x += (state.pointer.x * 0.24 - follow.current.x) * smoothing;
-    follow.current.y += (state.pointer.y * 0.16 - follow.current.y) * smoothing;
+    follow.current.x += (choreoBus.pointerX * 0.24 - follow.current.x) * smoothing;
+    follow.current.y += (choreoBus.pointerY * 0.16 - follow.current.y) * smoothing;
 
     mesh.current.rotation.y = spin.current + follow.current.x;
     mesh.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.1 + follow.current.y;
@@ -241,7 +329,6 @@ function KidneyCore({ reduced, animateFresnel }: { reduced: boolean; animateFres
 
 function SignalNode({ color, phase, reduced }: (typeof SIGNALS)[number] & { reduced: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const hovered = useRef(false);
 
   useFrame((state, delta) => {
     if (!group.current) return;
@@ -254,22 +341,14 @@ function SignalNode({ color, phase, reduced }: (typeof SIGNALS)[number] & { redu
       Math.sin(t) * 0.64,
     );
 
-    const target = hovered.current ? 1.45 : 1;
-    const next = group.current.scale.x + (target - group.current.scale.x) * (1 - Math.exp(-8 * delta));
+    const breathe = reduced ? 0 : Math.sin(state.clock.elapsedTime * 1.6 + phase) * 0.1;
+    const next = group.current.scale.x + (1 + breathe - group.current.scale.x) * (1 - Math.exp(-8 * delta));
     group.current.scale.setScalar(next);
   });
 
   return (
     <group ref={group}>
-      <mesh
-        onPointerOver={(event) => {
-          event.stopPropagation();
-          hovered.current = true;
-        }}
-        onPointerOut={() => {
-          hovered.current = false;
-        }}
-      >
+      <mesh>
         <sphereGeometry args={[0.1, 20, 20]} />
         <meshBasicMaterial color={color} transparent opacity={0.98} />
       </mesh>
@@ -286,8 +365,9 @@ function OrbitSystem({ reduced }: { reduced: boolean }) {
 
   useFrame((state, delta) => {
     if (!orbit.current || reduced) return;
-    orbit.current.rotation.y += delta * 0.055;
-    orbit.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.24) * 0.09;
+    const calm = choreoBus.calm;
+    orbit.current.rotation.y += delta * 0.055 * (1 - calm * 0.7);
+    orbit.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.24) * 0.09 * (1 - calm * 0.6);
   });
 
   return (
@@ -312,8 +392,6 @@ function Particles({ count = 280, reduced }: { count?: number; reduced: boolean 
   const material = useRef<THREE.ShaderMaterial>(null);
   const geometry = useRef<THREE.BufferGeometry>(null);
 
-  // Interaction state: the ripple is active while the pointer is pressed.
-  const pointer = useRef({ down: false, world: new THREE.Vector3() });
   const scratch = useRef({ inv: new THREE.Matrix4(), local: new THREE.Vector3() });
 
   const effectiveCount = useMemo(
@@ -351,20 +429,23 @@ function Particles({ count = 280, reduced }: { count?: number; reduced: boolean 
     () => ({
       uTime: { value: 0 },
       uColor: { value: TEAL },
+      uCalm: { value: 0 },
     }),
     [],
   );
 
   useFrame((state, delta) => {
+    const calm = reduced ? 1 : choreoBus.calm;
     if (material.current) {
       material.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
+      material.current.uniforms.uCalm.value = calm;
     }
     const pts = points.current;
     const geom = geometry.current;
     if (!pts || !geom || reduced) return;
 
-    pts.rotation.y += delta * 0.016;
-    pts.rotation.x += Math.sin(state.clock.elapsedTime * 0.1) * delta * 0.008;
+    pts.rotation.y += delta * 0.016 * (1 - calm * 0.78);
+    pts.rotation.x += Math.sin(state.clock.elapsedTime * 0.1) * delta * 0.008 * (1 - calm * 0.7);
     // Keep matrixWorld current so the pointer position maps into local space.
     pts.updateMatrixWorld();
 
@@ -372,10 +453,10 @@ function Particles({ count = 280, reduced }: { count?: number; reduced: boolean 
     const damp = Math.exp(-RIPPLE_DAMPING * delta);
     const spring = RIPPLE_SPRING * delta;
 
-    if (pointer.current.down) {
+    if (choreoBus.down) {
       const { inv, local } = scratch.current;
       inv.copy(pts.matrixWorld).invert();
-      local.copy(pointer.current.world).applyMatrix4(inv);
+      local.copy(choreoBus.pointerWorld).applyMatrix4(inv);
       const px = local.x;
       const py = local.y;
       const pz = local.z;
@@ -426,26 +507,6 @@ function Particles({ count = 280, reduced }: { count?: number; reduced: boolean 
         depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
-      {/* Invisible capture surface so the pointer-repel ripple works anywhere
-          over the hero canvas, including drags across empty space. */}
-      <mesh
-        onPointerDown={(event) => {
-          pointer.current.down = true;
-          pointer.current.world.copy(event.point);
-        }}
-        onPointerMove={(event) => {
-          if (pointer.current.down) pointer.current.world.copy(event.point);
-        }}
-        onPointerUp={() => {
-          pointer.current.down = false;
-        }}
-        onPointerLeave={() => {
-          pointer.current.down = false;
-        }}
-      >
-        <sphereGeometry args={[5.4, 12, 12]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
     </points>
   );
 }
@@ -453,10 +514,11 @@ function Particles({ count = 280, reduced }: { count?: number; reduced: boolean 
 function Scene({ config }: { config: PerfConfig }) {
   const reduced = useReducedMotion();
   const viewport = useThree((state) => state.viewport);
-  const wide = viewport.width >= 7.2;
+  const compact = viewport.width < 7.2;
 
   return (
-    <group position={[wide ? 1.42 : 0.08, 0, 0]} scale={wide ? 1 : 0.76}>
+    <group position={[0, 0, 0]} scale={compact ? 0.72 : 1}>
+      <ChoreographyRig reduced={reduced} />
       <KidneyCore reduced={reduced} animateFresnel={config.animateFresnel} />
       <OrbitSystem reduced={reduced} />
       <Particles count={config.particles} reduced={reduced} />
@@ -467,6 +529,7 @@ function Scene({ config }: { config: PerfConfig }) {
 export default function KidneyScene({ className = "absolute inset-0" }: { className?: string }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
+  const [paused, setPaused] = useState(false);
   const [webgl] = useState<boolean>(() => supportsWebGL());
   const [contextLost, setContextLost] = useState(false);
   const config = useMemo(() => getPerfConfig(), []);
@@ -482,16 +545,23 @@ export default function KidneyScene({ className = "absolute inset-0" }: { classN
     return () => observer.disconnect();
   }, []);
 
+  // A fixed full-bleed backdrop is always "in view", so additionally pause the
+  // render loop while the tab is hidden to keep background power use at zero.
+  useEffect(() => {
+    const onVisibility = () => setPaused(document.hidden);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
   return (
     <div ref={wrap} className={className} aria-hidden="true">
       {webgl && !contextLost ? (
         <SceneErrorBoundary fallback={<PosterFrame />}>
           <Canvas
-            frameloop={visible ? "always" : "never"}
+            frameloop={visible && !paused ? "always" : "never"}
             camera={{ position: [0, 0, 5.8], fov: 45 }}
             gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
             dpr={[1, config.maxDpr]}
-            style={{ touchAction: "none" }}
             onCreated={({ gl }) => {
               const onLost = () => setContextLost(true);
               gl.domElement.addEventListener("webglcontextlost", onLost);

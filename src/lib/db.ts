@@ -62,7 +62,10 @@ export async function listRecords(): Promise<RecordRow[]> {
               alb_stage, kdigo_risk, kfre_2yr, kfre_5yr, crcl, guidance, created_at
        FROM kidney_records ORDER BY created_at DESC`;
     return rows as unknown as RecordRow[];
-  } catch {
+  } catch (error) {
+    // Log the cause (Neon error text never contains the connection string) so
+    // runtime failures are diagnosable instead of silently rendering empty.
+    console.error("listRecords failed", { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 }
@@ -78,7 +81,8 @@ export async function insertRecord(r: Omit<RecordRow, "id" | "created_at">): Pro
         ${r.egfr}, ${r.gfr_stage}, ${r.alb_stage}, ${r.kdigo_risk}, ${r.kfre_2yr},
         ${r.kfre_5yr}, ${r.crcl}, ${JSON.stringify(r.guidance)})`;
     return true;
-  } catch {
+  } catch (error) {
+    console.error("record mutation failed", { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }
@@ -89,7 +93,8 @@ export async function deleteRecord(id: number): Promise<boolean> {
   try {
     await sql`DELETE FROM kidney_records WHERE id = ${id}`;
     return true;
-  } catch {
+  } catch (error) {
+    console.error("record mutation failed", { error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }

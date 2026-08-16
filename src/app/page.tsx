@@ -1,8 +1,7 @@
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
-import Hero from "@/components/hero/Hero";
-import HeroScene from "@/components/hero/HeroScene";
-import type { HeroStat } from "@/components/hero/HeroStats";
+import LandingBackdrop from "@/components/hero/LandingBackdrop";
+import { HeroStats, type HeroStat } from "@/components/hero/HeroStats";
 import {
   albStage,
   egfrCkdEpi2021,
@@ -82,194 +81,259 @@ const STEPS = [
   },
 ];
 
+const BADGES = ["Published equations", "CKD-EPI 2021", "KFRE (Tangri)", "KDIGO 2024"];
+const SIGNALS = ["eGFR", "KFRE risk", "KDIGO stage"] as const;
+
+/**
+ * Landing page: the kidney scene is the fixed full-viewport backdrop and the
+ * content scrolls over it. Each section owns a choreography pose via its
+ * data-choreo attribute; the camera rig damps between poses as you scroll.
+ * Without WebGL the poster renders instead; with reduced motion the scene is
+ * a static composed frame and the page reads as a normal editorial document.
+ */
 export default function LandingPage() {
   return (
-    <div className="relative left-1/2 -mt-10 w-screen -translate-x-1/2 overflow-x-clip">
-      <Hero stats={HERO_STATS} />
+    <>
+      {/* Fixed WebGL backdrop (landing page only). */}
+      <LandingBackdrop />
 
-      <section className="mx-auto max-w-5xl px-6 py-20 sm:py-24">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            Every number on this page was computed, not generated
-          </p>
-          <h2 className="mt-4 text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-            Three outputs. One transparent calculation path.
-          </h2>
-          <p className="mt-4 text-pretty leading-relaxed text-muted">
-            The moving signals in the hero correspond to the same deterministic outputs below. This
-            is a demonstration patient, not a generated report.
-          </p>
-        </div>
-        <Reveal stagger className="mt-10 grid gap-5 md:grid-cols-3">
-          {FEATURES.map((feature) => (
-            <article
-              key={feature.title}
-              className="group relative overflow-hidden rounded-[calc(var(--radius-base)+4px)] border border-border bg-surface p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
+      <div className="relative z-10">
+        {/* HERO */}
+        <section data-choreo="hero" className="relative flex min-h-[calc(100dvh-7rem)] flex-col justify-center py-16">
+          <div className="max-w-2xl">
+            <p className="eyebrow hero-reveal" style={{ "--i": 0 } as React.CSSProperties}>
+              Published equations · Deterministic · Citeable
+            </p>
+            <h1
+              className="hero-reveal mt-5 text-balance font-bold text-text"
+              style={{
+                "--i": 1,
+                fontSize: "clamp(2.75rem, 6vw, 5.25rem)",
+                lineHeight: 1.02,
+                letterSpacing: "-0.045em",
+              } as React.CSSProperties}
             >
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
-              <div className="flex items-center justify-between">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="size-7 text-primary"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+              Kidney numbers,
+              <br />
+              <span className="text-muted">made clear.</span>
+            </h1>
+            <p
+              className="hero-reveal mt-6 max-w-xl text-pretty text-base leading-relaxed text-muted sm:text-lg"
+              style={{ "--i": 2 } as React.CSSProperties}
+            >
+              Published renal equations, visible step by step. CKD-EPI 2021 eGFR, the Kidney
+              Failure Risk Equation, and KDIGO staging — computed in the open, never generated
+              by a model.
+            </p>
+            <div
+              className="hero-reveal mt-9 flex flex-wrap items-center gap-3"
+              style={{ "--i": 3 } as React.CSSProperties}
+            >
+              <Link
+                href="/calculator"
+                className="pressable rounded-[var(--radius-base)] bg-primary px-7 py-3 text-sm font-semibold text-primary-fg shadow-lg shadow-primary/20 transition-opacity hover:opacity-90"
+              >
+                Open calculator
+              </Link>
+              <Link
+                href="/imaging"
+                className="pressable rounded-[var(--radius-base)] border border-border bg-surface/80 px-7 py-3 text-sm font-semibold backdrop-blur-sm transition-colors hover:bg-surface"
+              >
+                Review an image
+              </Link>
+            </div>
+            <div className="mt-8 flex max-w-xl flex-wrap items-center gap-2">
+              {BADGES.map((badge, index) => (
+                <span
+                  key={badge}
+                  className="hero-pop rounded-full border border-border bg-surface/70 px-3 py-1 text-[11px] font-medium text-muted shadow-sm backdrop-blur-sm"
+                  style={{ "--i": index } as React.CSSProperties}
                 >
-                  <path d={feature.icon} />
-                </svg>
-                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
-                  {feature.signal}
+                  {badge}
                 </span>
-              </div>
-              <h3 className="mt-5 text-lg font-semibold tracking-tight">{feature.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">{feature.body}</p>
-              <p className="mt-5 text-2xl font-bold tracking-tight tabular-nums text-text">
-                {feature.value}
-              </p>
-              <p className="mt-1 text-xs text-muted tabular-nums">{feature.note}</p>
-            </article>
-          ))}
-        </Reveal>
-      </section>
+              ))}
+            </div>
+            <HeroStats stats={HERO_STATS} />
+            <div
+              className="hero-reveal mt-7 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted"
+              style={{ "--i": 4 } as React.CSSProperties}
+              role="group"
+              aria-label="Three live calculation signals represented in the visualization"
+            >
+              <span className="text-muted/80">Live signals</span>
+              {SIGNALS.map((signal) => (
+                <span key={signal} className="inline-flex items-center gap-1.5 text-text">
+                  <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
+                  {signal}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
 
-      <section className="border-y border-border bg-[linear-gradient(180deg,color-mix(in_oklab,var(--surface)_96%,var(--primary)_4%),var(--bg))]">
-        <div className="mx-auto max-w-5xl px-6 py-20 sm:py-24">
+        {/* SIGNALS */}
+        <section data-choreo="signals" data-choreo-fade className="relative py-24 sm:py-32">
+          <div className="max-w-2xl">
+            <p className="eyebrow">Every number on this page was computed, not generated</p>
+            <h2 className="display-2 mt-4 text-balance text-text">
+              Three outputs. One transparent calculation path.
+            </h2>
+            <p className="mt-4 text-pretty leading-relaxed text-muted">
+              The moving signals around the kidney correspond to the same deterministic outputs
+              below. This is a demonstration patient, not a generated report.
+            </p>
+          </div>
+          <Reveal stagger className="mt-10 grid gap-5 md:grid-cols-3">
+            {FEATURES.map((feature) => (
+              <article
+                key={feature.title}
+                className="group relative overflow-hidden rounded-[calc(var(--radius-base)+4px)] border border-border bg-surface/85 p-6 shadow-[var(--shadow-card)] backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
+              >
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
+                <div className="flex items-center justify-between">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-7 text-accent"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d={feature.icon} />
+                  </svg>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
+                    {feature.signal}
+                  </span>
+                </div>
+                <h3 className="mt-5 text-lg font-semibold tracking-tight text-text">{feature.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted">{feature.body}</p>
+                <p className="mt-5 text-2xl font-bold tracking-tight tabular-nums text-text">
+                  {feature.value}
+                </p>
+                <p className="mt-1 text-xs text-muted tabular-nums">{feature.note}</p>
+              </article>
+            ))}
+          </Reveal>
+        </section>
+
+        {/* PROCESS */}
+        <section data-choreo="process" data-choreo-fade className="relative py-24 sm:py-32">
           <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                Computation, made inspectable
-              </p>
-              <h2 className="mt-4 text-balance text-3xl font-bold tracking-tight sm:text-4xl">
+              <p className="eyebrow">Computation, made inspectable</p>
+              <h2 className="display-2 mt-4 text-balance text-text">
                 The answer is not a black box.
               </h2>
               <p className="mt-4 max-w-lg text-pretty leading-relaxed text-muted">
                 Nephro turns a small set of clinical values into a citeable assessment. The route
                 from input to guidance is visible at every step.
               </p>
-            <Link
-              href="/methods"
-              className="pressable mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-accent"
-            >
+              <Link
+                href="/methods"
+                className="pressable mt-6 inline-flex items-center gap-2 text-sm font-semibold text-accent transition-colors hover:text-accent-strong"
+              >
                 Inspect the published methods
                 <span aria-hidden="true">→</span>
               </Link>
             </div>
-            <div className="space-y-3">
-              <div className="relative min-h-48 overflow-hidden rounded-[calc(var(--radius-base)+5px)] border border-slate-200 bg-[radial-gradient(circle_at_50%_42%,#fdf3e9_0%,#f9ead9_42%,#f3e3d2_100%)] shadow-[var(--shadow-card)]">
-                <HeroScene className="absolute inset-0 opacity-90" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f3e3d2] to-transparent" aria-hidden="true" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 p-4">
-                  <div>
-                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Interactive signal field</p>
-                    <p className="mt-1 text-sm font-semibold tracking-[-0.02em] text-slate-800">Three inputs, one traceable assessment.</p>
-                  </div>
-                  <span className="rounded-full border border-white/80 bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-sm backdrop-blur-sm">Explore</span>
-                </div>
-              </div>
-              <Reveal stagger as="div" className="grid gap-3 sm:grid-cols-2">
+            <Reveal stagger as="div" className="grid gap-3 sm:grid-cols-2">
               {STEPS.map((step) => (
                 <article
                   key={step.number}
-                  className="rounded-[calc(var(--radius-base)+2px)] border border-border bg-surface/80 p-5 shadow-sm"
+                  className="rounded-[calc(var(--radius-base)+2px)] border border-border bg-surface/85 p-5 shadow-sm backdrop-blur-md"
                 >
-                  <span className="font-mono text-xs font-semibold tracking-[0.16em] text-primary">
+                  <span className="font-mono text-xs font-semibold tracking-[0.16em] text-accent">
                     {step.number}
                   </span>
-                  <h3 className="mt-5 text-base font-semibold tracking-tight">{step.title}</h3>
+                  <h3 className="mt-5 text-base font-semibold tracking-tight text-text">{step.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted">{step.body}</p>
                 </article>
               ))}
-              </Reveal>
-            </div>
+            </Reveal>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <Reveal as="section" delay={100} className="border-b border-border bg-surface/60">
-        <div className="mx-auto grid max-w-5xl gap-10 px-6 py-20 md:grid-cols-2 md:items-center">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Transparent by design
-            </p>
-            <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-              No black boxes. Every intermediate value visible.
-            </h2>
-            <p className="mt-4 text-pretty leading-relaxed text-muted">
-              This tool runs the exact published equations nephrologists rely on, shows the inputs
-              and classification logic behind each result, and cites the source for every
-              calculation family. The same inputs produce the same result on every device.
-            </p>
-            <Link
-              href="/methods"
-              className="pressable mt-6 inline-block rounded-[var(--radius-base)] bg-primary px-5 py-2.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
-            >
-              Read the methods
-            </Link>
-          </div>
-          <div className="rounded-[calc(var(--radius-base)+2px)] border border-border bg-surface p-6 shadow-lg shadow-primary/5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Deterministic, always
-              </span>
-              <span className="rounded-full bg-low/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                Verified
-              </span>
+        {/* VERIFIED GUIDANCE */}
+        <section data-choreo="process" data-choreo-fade className="relative py-24 sm:py-32">
+          <div className="grid gap-10 md:grid-cols-2 md:items-center">
+            <div>
+              <p className="eyebrow">Transparent by design</p>
+              <h2 className="display-2 mt-3 text-balance text-text">
+                No black boxes. Every intermediate value visible.
+              </h2>
+              <p className="mt-4 text-pretty leading-relaxed text-muted">
+                This tool runs the exact published equations nephrologists rely on, shows the
+                inputs and classification logic behind each result, and cites the source for
+                every calculation family. The same inputs produce the same result on every device.
+              </p>
+              <Link
+                href="/methods"
+                className="pressable mt-6 inline-block rounded-[var(--radius-base)] bg-primary px-5 py-2.5 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
+              >
+                Read the methods
+              </Link>
             </div>
-            <ul className="mt-5 space-y-2.5 text-sm">
-              {guidance({ egfr, acrMgG: PATIENT.acrMgG, risk, kfre2: kf.risk2yr }).map((item) => (
-                <li key={item} className="flex gap-2.5 text-pretty text-text">
+            <div className="rounded-[calc(var(--radius-base)+2px)] border border-border bg-surface/90 p-6 shadow-lg shadow-primary/5 backdrop-blur-md">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  Deterministic, always
+                </span>
+                <span className="rounded-full bg-low/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  Verified
+                </span>
+              </div>
+              <ul className="mt-5 space-y-2.5 text-sm">
+                {guidance({ egfr, acrMgG: PATIENT.acrMgG, risk, kfre2: kf.risk2yr }).map((item) => (
+                  <li key={item} className="flex gap-2.5 text-pretty text-text">
+                    <span className="mt-0.5 text-accent" aria-hidden="true">
+                      ✓
+                    </span>
+                    {item}
+                  </li>
+                ))}
+                <li className="flex gap-2.5 text-pretty text-muted">
                   <span className="mt-0.5 text-accent" aria-hidden="true">
                     ✓
                   </span>
-                  {item}
+                  Guidance is generated from guideline rules, not a language model.
                 </li>
-              ))}
-              <li className="flex gap-2.5 text-pretty text-muted">
-                <span className="mt-0.5 text-accent" aria-hidden="true">
-                  ✓
-                </span>
-                Guidance is generated from guideline rules, not a language model.
-              </li>
-            </ul>
-            <div className="mt-6 rounded-[var(--radius-base)] bg-bg px-4 py-3 font-mono text-xs text-muted">
-              scr 1.4 mg/dL · age 58 · female → eGFR {egfr.toFixed(1)} · {g} {a} · KFRE 2yr{" "}
-              {(kf.risk2yr * 100).toFixed(1)}%
+              </ul>
+              <div className="mt-6 rounded-[var(--radius-base)] bg-bg px-4 py-3 font-mono text-xs text-muted">
+                scr 1.4 mg/dL · age 58 · female → eGFR {egfr.toFixed(1)} · {g} {a} · KFRE 2yr{" "}
+                {(kf.risk2yr * 100).toFixed(1)}%
+              </div>
             </div>
           </div>
-        </div>
-      </Reveal>
+        </section>
 
-      <Reveal as="section" delay={100} className="relative overflow-hidden px-6 py-24 text-center">
-        <div
-          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklab,var(--primary)_12%,transparent),transparent_52%)]"
-          aria-hidden="true"
-        />
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Ready when you are</p>
-        <h2 className="mt-4 text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-          Run it on a real patient, right now.
-        </h2>
-        <p className="mx-auto mt-4 max-w-md text-pretty text-muted">
-          Two minutes of lab values in — a complete, citeable CKD assessment out.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/calculator"
-            className="pressable rounded-[var(--radius-base)] bg-primary px-7 py-3 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
-          >
-            Open calculator
-          </Link>
-          <Link
-            href="/records"
-            className="pressable rounded-[var(--radius-base)] border border-border bg-surface px-7 py-3 text-sm font-semibold transition-colors hover:bg-bg"
-          >
-            View patient records
-          </Link>
-        </div>
-      </Reveal>
-    </div>
+        {/* CTA */}
+        <section data-choreo="cta" data-choreo-fade className="relative flex min-h-[70dvh] flex-col items-center justify-center py-24 text-center">
+          <p className="eyebrow">Ready when you are</p>
+          <h2 className="display-2 mt-4 text-balance text-text">
+            Run it on a real patient, right now.
+          </h2>
+          <p className="mx-auto mt-4 max-w-md text-pretty text-muted">
+            Two minutes of lab values in — a complete, citeable CKD assessment out.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/calculator"
+              className="pressable rounded-[var(--radius-base)] bg-primary px-7 py-3 text-sm font-semibold text-primary-fg transition-opacity hover:opacity-90"
+            >
+              Open calculator
+            </Link>
+            <Link
+              href="/records"
+              className="pressable rounded-[var(--radius-base)] border border-border bg-surface/80 px-7 py-3 text-sm font-semibold backdrop-blur-sm transition-colors hover:bg-surface"
+            >
+              View patient records
+            </Link>
+          </div>
+        </section>
+      </div>
+    </>
   );
 }
 

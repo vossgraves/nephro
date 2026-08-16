@@ -1,6 +1,6 @@
 "use server";
 
-import { deleteRecord, insertRecord } from "@/lib/db";
+import { deleteRecord, insertRecord, isDbConfigured } from "@/lib/db";
 
 export type SaveRecordInput = {
   patientName: string;
@@ -23,6 +23,9 @@ export async function saveRecord(input: SaveRecordInput): Promise<{ ok: boolean;
   if (!input.patientName.trim()) return { ok: false, error: "Patient name is required." };
   if (!(input.age > 0) || !(input.scrMgDl > 0) || !(input.uacrMgG > 0))
     return { ok: false, error: "Age, creatinine, and uACR must be positive." };
+  if (!isDbConfigured()) {
+    return { ok: false, error: "Database not configured (DATABASE_URL missing)." };
+  }
   const ok = await insertRecord({
     patient_name: input.patientName.trim(),
     age: input.age,
@@ -39,7 +42,7 @@ export async function saveRecord(input: SaveRecordInput): Promise<{ ok: boolean;
     crcl: input.crcl,
     guidance: input.guidance,
   });
-  return ok ? { ok: true } : { ok: false, error: "Database not configured (DATABASE_URL missing)." };
+  return ok ? { ok: true } : { ok: false, error: "Could not save the record. The database write failed — try again later." };
 }
 
 export async function removeRecord(id: number): Promise<{ ok: boolean }> {
