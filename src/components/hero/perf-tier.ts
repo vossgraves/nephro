@@ -48,6 +48,27 @@ export function getPerfTier(): PerfTier {
   // Reduced motion wins outright: a static, cheap scene is the point.
   if (matchesMedia(REDUCED_MOTION_QUERY)) return "low";
 
+  // Software GL (SwiftShader/llvmpipe) renders correctly but slowly — the
+  // animated shader scene gets the low tier regardless of core count.
+  if (typeof document !== "undefined" && typeof WebGL2RenderingContext !== "undefined") {
+    try {
+      const probe = document.createElement("canvas");
+      const gl = probe.getContext("webgl2");
+      if (gl) {
+        const info = gl.getExtension("WEBGL_debug_renderer_info");
+        const renderer = String(
+          info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+        ).toLowerCase();
+        gl.getExtension("WEBGL_lose_context")?.loseContext();
+        if (renderer.includes("swiftshader") || renderer.includes("llvmpipe") || renderer.includes("software")) {
+          return "low";
+        }
+      }
+    } catch {
+      // probe failure keeps the normal tier path
+    }
+  }
+
   const coarse = matchesMedia(COARSE_POINTER_QUERY);
   const cores = navigator.hardwareConcurrency;
   const memory = (navigator as NavigatorWithMemory).deviceMemory;

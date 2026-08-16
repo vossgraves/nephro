@@ -563,8 +563,13 @@ export default function KidneyScene({ className = "absolute inset-0" }: { classN
             gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
             dpr={[1, config.maxDpr]}
             onCreated={({ gl }) => {
-              const onLost = () => setContextLost(true);
+              const onLost = (event: Event) => {
+                event.preventDefault(); // allow the browser to restore the context
+                setContextLost(true);
+              };
+              const onRestored = () => setContextLost(false);
               gl.domElement.addEventListener("webglcontextlost", onLost);
+              gl.domElement.addEventListener("webglcontextrestored", onRestored);
             }}
           >
             <Scene config={config} />

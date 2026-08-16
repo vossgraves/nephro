@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/lib/renal.test.ts && tsx src/lib/imaging-recognition.test.ts && tsx src/lib/bosniak.test.ts && tsx src/lib/image-quality.test.ts && tsx src/lib/report.test.ts"
+    "test": "tsx src/lib/renal.test.ts && tsx src/lib/imaging-recognition.test.ts && tsx src/lib/bosniak.test.ts && tsx src/lib/image-quality.test.ts && tsx src/lib/report.test.ts && tsx src/lib/ai/orchestrator.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",

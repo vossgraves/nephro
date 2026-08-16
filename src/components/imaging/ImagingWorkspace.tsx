@@ -224,6 +224,7 @@ type IconName =
   | "area"
   | "eraser"
   | "x"
+  | "compare"
   | "copy"
   | "download"
   | "printer";
@@ -267,6 +268,7 @@ function Icon({ name, className = "size-4" }: { name: IconName; className?: stri
   if (name === "area") return <svg {...props}><rect x="4" y="4" width="16" height="16" rx="1" /><path d="m4 20 16-16" /></svg>;
   if (name === "eraser") return <svg {...props}><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21" /><path d="M22 21H7M5 11l9 9" /></svg>;
   if (name === "x") return <svg {...props}><path d="M18 6 6 18M6 6l12 12" /></svg>;
+  if (name === "compare") return <svg {...props}><rect x="3" y="3" width="14" height="14" rx="1" /><rect x="7" y="7" width="14" height="14" rx="1" /></svg>;
   if (name === "copy") return <svg {...props}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>;
   if (name === "download") return <svg {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>;
   if (name === "printer") return <svg {...props}><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>;
@@ -655,6 +657,64 @@ function routeErrorMessage(status: number, body: RouteErrorBody | null, fallback
   return fallback;
 }
 
+/** View options a canvas renderer honours (shared by the current + comparison panes). */
+type CanvasRenderOptions = {
+  zoom: number;
+  pan: { x: number; y: number };
+  rotation: Rotation;
+  brightness: number;
+  contrast: number;
+  invert: boolean;
+  grid: boolean;
+};
+
+/**
+ * Render one image into one canvas: DPI-aware sizing, dark background, the
+ * image placement from the shared zoom/pan (and the pane's own rotation), the
+ * brightness/contrast/invert filter, and the optional grid. The comparison
+ * pane uses this with its own rotation so both panes never drift apart.
+ */
+function renderImageToCanvas(canvas: HTMLCanvasElement, image: HTMLImageElement | null, options: CanvasRenderOptions) {
+  const bounds = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(bounds.width * ratio));
+  const height = Math.max(1, Math.round(bounds.height * ratio));
+  if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.save();
+  context.scale(ratio, ratio);
+  context.fillStyle = "#131518";
+  context.fillRect(0, 0, bounds.width, bounds.height);
+  if (!image) { context.restore(); return; }
+  const placement = computeImagePlacement(bounds, image, options.zoom, options.pan, options.rotation);
+  const centerX = bounds.width / 2;
+  const centerY = bounds.height / 2;
+  const radians = (options.rotation * Math.PI) / 180;
+  context.translate(centerX, centerY);
+  context.rotate(radians);
+  context.translate(-centerX, -centerY);
+  context.filter = `brightness(${options.brightness}%) contrast(${options.contrast}%)${options.invert ? " invert(1)" : ""}`;
+  context.drawImage(image, placement.x, placement.y, placement.renderedWidth, placement.renderedHeight);
+  context.filter = "none";
+  if (options.grid) {
+    context.save();
+    context.beginPath();
+    context.rect(placement.x, placement.y, placement.renderedWidth, placement.renderedHeight);
+    context.clip();
+    context.strokeStyle = "rgba(255,255,255,0.26)";
+    context.lineWidth = 1;
+    for (let index = 1; index < 8; index += 1) {
+      const horizontal = placement.y + (placement.renderedHeight / 8) * index;
+      const vertical = placement.x + (placement.renderedWidth / 8) * index;
+      context.beginPath(); context.moveTo(placement.x, horizontal); context.lineTo(placement.x + placement.renderedWidth, horizontal); context.stroke();
+      context.beginPath(); context.moveTo(vertical, placement.y); context.lineTo(vertical, placement.y + placement.renderedHeight); context.stroke();
+    }
+    context.restore();
+  }
+  context.restore();
+}
+
 export default function ImagingWorkspace() {
   const inputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -662,6 +722,9 @@ export default function ImagingWorkspace() {
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
   const viewerCardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const compareInputRef = useRef<HTMLInputElement>(null);
+  const compareCanvasRef = useRef<HTMLCanvasElement>(null);
+  const compareImageRef = useRef<HTMLImageElement | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
@@ -681,6 +744,12 @@ export default function ImagingWorkspace() {
   const [dragOrigin, setDragOrigin] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [breakpoint, setBreakpoint] = useState<Breakpoint>("desktop");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareUrl, setCompareUrl] = useState<string | null>(null);
+  const [compareFile, setCompareFile] = useState<File | null>(null);
+  const [compareInfo, setCompareInfo] = useState<ImageInfo | null>(null);
+  const [compareRotation, setCompareRotation] = useState<Rotation>(0);
+  const [compareIsDragging, setCompareIsDragging] = useState(false);
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("pan");
   const [history, setHistory] = useState<HistoryEntry[]>([{ annotations: [], measurements: [] }]);
@@ -901,6 +970,52 @@ export default function ImagingWorkspace() {
     reader.readAsDataURL(candidate);
   }, [resetView]);
 
+  /** Load the PREVIOUS / reference image for compare mode (view-only pane). */
+  const loadCompareFile = useCallback((candidate: File | undefined) => {
+    if (!candidate) return;
+    if (candidate.size > MAX_LOCAL_FILE_BYTES) {
+      setNotice("Choose an image smaller than 25 MB. Local review never uploads the file.");
+      return;
+    }
+    if (!ACCEPTED.has(candidate.type)) {
+      setNotice("This workspace reads exported PNG, JPEG, and WebP files. A DICOM study requires a dedicated DICOM viewer and workflow.");
+      return;
+    }
+    setCompareFile(candidate);
+    setCompareInfo(null);
+    setCompareRotation(0);
+    setCompareUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(candidate);
+    });
+  }, []);
+
+  const handleCompareDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation(); // the reference lands on the Previous pane, not as a new main image
+    setCompareIsDragging(false);
+    loadCompareFile(event.dataTransfer.files?.[0]);
+  };
+
+  /** Drop the reference image without leaving compare mode (keeps the second pane open). */
+  const removeCompareImage = useCallback(() => {
+    setCompareFile(null);
+    setCompareInfo(null);
+    setCompareRotation(0);
+    compareImageRef.current = null;
+    setCompareUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  }, []);
+
+  /** Leave compare mode: revoke the reference object URL and restore the single-view layout. */
+  const exitCompare = useCallback(() => {
+    setCompareMode(false);
+    setCompareIsDragging(false);
+    removeCompareImage();
+  }, [removeCompareImage]);
+
   useEffect(() => {
     if (!sourceUrl || !file) {
       imageRef.current = null;
@@ -930,49 +1045,39 @@ export default function ImagingWorkspace() {
     image.src = sourceUrl;
   }, [file, sourceUrl]);
 
+  useEffect(() => {
+    if (!compareUrl || !compareFile) {
+      compareImageRef.current = null;
+      setCompareInfo(null);
+      return;
+    }
+    const image = new Image();
+    image.onload = () => {
+      compareImageRef.current = image;
+      try {
+        const stats = extractImageStats(image);
+        setCompareInfo({ width: image.naturalWidth, height: image.naturalHeight, luminance: Math.round(stats.meanLuminance), source: compareFile.name });
+      } catch {
+        setCompareInfo({ width: image.naturalWidth, height: image.naturalHeight, luminance: 0, source: compareFile.name });
+      }
+    };
+    image.onerror = () => {
+      setNotice("The browser could not decode the previous image. Try an exported PNG or JPEG.");
+      compareImageRef.current = null;
+      setCompareInfo(null);
+    };
+    image.src = compareUrl;
+  }, [compareFile, compareUrl]);
+
+  const rotateCompare90 = useCallback(() => {
+    setCompareRotation((current) => (current === 0 ? 90 : current === 90 ? 180 : current === 180 ? 270 : 0));
+  }, []);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const image = imageRef.current;
-    if (!canvas) return;
     void info; // referenced so this callback re-runs (redraws) when a new image decodes
-    const bounds = canvas.getBoundingClientRect();
-    const ratio = window.devicePixelRatio || 1;
-    const width = Math.max(1, Math.round(bounds.width * ratio));
-    const height = Math.max(1, Math.round(bounds.height * ratio));
-    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.save();
-    context.scale(ratio, ratio);
-    context.fillStyle = "#131518";
-    context.fillRect(0, 0, bounds.width, bounds.height);
-    if (!image) { context.restore(); return; }
-    const placement = computeImagePlacement(bounds, image, zoom, pan, rotation);
-    const centerX = bounds.width / 2;
-    const centerY = bounds.height / 2;
-    const radians = (rotation * Math.PI) / 180;
-    context.translate(centerX, centerY);
-    context.rotate(radians);
-    context.translate(-centerX, -centerY);
-    context.filter = `brightness(${brightness}%) contrast(${contrast}%)${invert ? " invert(1)" : ""}`;
-    context.drawImage(image, placement.x, placement.y, placement.renderedWidth, placement.renderedHeight);
-    context.filter = "none";
-    if (grid) {
-      context.save();
-      context.beginPath();
-      context.rect(placement.x, placement.y, placement.renderedWidth, placement.renderedHeight);
-      context.clip();
-      context.strokeStyle = "rgba(255,255,255,0.26)";
-      context.lineWidth = 1;
-      for (let index = 1; index < 8; index += 1) {
-        const horizontal = placement.y + (placement.renderedHeight / 8) * index;
-        const vertical = placement.x + (placement.renderedWidth / 8) * index;
-        context.beginPath(); context.moveTo(placement.x, horizontal); context.lineTo(placement.x + placement.renderedWidth, horizontal); context.stroke();
-        context.beginPath(); context.moveTo(vertical, placement.y); context.lineTo(vertical, placement.y + placement.renderedHeight); context.stroke();
-      }
-      context.restore();
-    }
-    context.restore();
+    if (canvas) renderImageToCanvas(canvas, image, { zoom, pan, rotation, brightness, contrast, invert, grid });
     // `info` is a dep only to trigger a redraw when a new image finishes decoding.
   }, [brightness, contrast, grid, info, invert, pan, rotation, zoom]);
 
@@ -1017,15 +1122,24 @@ export default function ImagingWorkspace() {
     // `info` is a dep only to trigger a redraw when a new image finishes decoding.
   }, [angleDraft, anglePreview, annotations, draft, info, measurements, movingShape, pan, rotation, selectedId, zoom]);
 
+  const drawCompare = useCallback(() => {
+    const canvas = compareCanvasRef.current;
+    const image = compareImageRef.current;
+    void compareInfo; // referenced so this callback re-runs (redraws) when the comparison image decodes
+    if (canvas) renderImageToCanvas(canvas, image, { zoom, pan, rotation: compareRotation, brightness, contrast, invert, grid });
+    // `compareInfo` is a dep only to trigger a redraw when the comparison image finishes decoding.
+  }, [brightness, compareInfo, compareRotation, contrast, grid, invert, pan, zoom]);
+
   useEffect(() => {
     draw();
     drawOverlay();
+    drawCompare();
     const wrapper = canvasWrapperRef.current;
     if (!wrapper) return;
-    const observer = new ResizeObserver(() => { draw(); drawOverlay(); });
+    const observer = new ResizeObserver(() => { draw(); drawOverlay(); drawCompare(); });
     observer.observe(wrapper);
     return () => observer.disconnect();
-  }, [draw, drawOverlay]);
+  }, [compareMode, draw, drawCompare, drawOverlay]);
 
   const renderPointer = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -1252,6 +1366,28 @@ export default function ImagingWorkspace() {
     if (dragOrigin) setDragOrigin(null);
     finalizeGestures();
     setSample(null);
+  };
+
+  // The comparison pane is view-only: dragging anywhere on it pans the shared
+  // view (both panes move together). It never starts annotations or drafts.
+  const handleComparePointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
+    const canvas = compareCanvasRef.current;
+    if (!canvas || !compareImageRef.current) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragOrigin({ x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y });
+  };
+
+  const handleComparePointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (!dragOrigin) return;
+    setPan({ x: dragOrigin.panX + event.clientX - dragOrigin.x, y: dragOrigin.panY + event.clientY - dragOrigin.y });
+  };
+
+  const handleComparePointerUp = () => {
+    if (dragOrigin) setDragOrigin(null);
+  };
+
+  const handleComparePointerCancel = () => {
+    if (dragOrigin) setDragOrigin(null);
   };
 
   useEffect(() => {
@@ -1518,6 +1654,7 @@ export default function ImagingWorkspace() {
               <button type="button" onClick={() => setZoom((value) => Math.min(3, +(value + 0.2).toFixed(1)))} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)", transition: "background-color 140ms ease, border-color 140ms ease" }} className="pressable" aria-label="Zoom in"><Icon name="zoomIn" className="size-4" /></button>
               <button type="button" onClick={() => setZoom((value) => Math.max(0.6, +(value - 0.2).toFixed(1)))} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)", transition: "background-color 140ms ease, border-color 140ms ease" }} className="pressable" aria-label="Zoom out"><Icon name="zoomOut" className="size-4" /></button>
               <button type="button" onClick={resetView} style={{ width: "32px", height: "32px", padding: "0", background: "transparent", border: "1px solid var(--border)", borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)", transition: "background-color 140ms ease, border-color 140ms ease" }} className="pressable" aria-label="Reset view"><Icon name="reset" className="size-4" /></button>
+              <button type="button" onClick={() => (compareMode ? exitCompare() : setCompareMode(true))} aria-pressed={compareMode} className="pressable" title={compareMode ? "Exit compare mode" : "Compare with a previous image"} aria-label={compareMode ? "Exit compare mode" : "Compare with a previous image"} style={{ width: "32px", height: "32px", padding: "0", background: compareMode ? "var(--accent)" : "transparent", border: `1px solid ${compareMode ? "var(--accent)" : "var(--border)"}`, borderRadius: controlRadius, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: compareMode ? "var(--accent-fg)" : "var(--text)", transition: "background-color 140ms ease, border-color 140ms ease" }}><Icon name="compare" className="size-4" /></button>
             </div>
           </div>
 
@@ -1558,39 +1695,120 @@ export default function ImagingWorkspace() {
           </div>
 
           {/* Canvas */}
-          <div ref={canvasWrapperRef} style={{ position: "relative", backgroundColor: "#131518", padding: "1rem", aspectRatio: isFullscreen ? "auto" : "4/3", flex: isFullscreen ? "1 1 auto" : undefined, minHeight: isFullscreen ? 0 : undefined }}>
-            <canvas ref={canvasRef} style={{ width: "100%", height: "100%", borderRadius: "calc(var(--radius-base) - 4px)", display: "block", touchAction: "none", cursor: CURSOR_FOR_TOOL[activeTool] }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onPointerLeave={() => { if (!dragOrigin && !draft) setSample(null); if (!draft) setAnglePreview(null); }} aria-label="Image viewer. Drag to pan; move pointer for pixel intensity." />
-            <canvas ref={overlayRef} style={{ position: "absolute", inset: "1rem", borderRadius: "calc(var(--radius-base) - 4px)", pointerEvents: "none" }} aria-hidden="true" />
-            {pendingText && textInputPos && (
-              <input
-                autoFocus
-                value={pendingText.value}
-                onChange={(event) => setPendingText((current) => current ? { ...current, value: event.target.value } : current)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") { event.preventDefault(); commitText(); }
-                  if (event.key === "Escape") { event.preventDefault(); cancelText(); }
-                }}
-                onBlur={commitText}
-                placeholder="Label text, then Enter ↵"
-                maxLength={120}
-                aria-label="Annotation text"
-                style={{ position: "absolute", left: textInputPos.x, top: textInputPos.y, width: "160px", padding: "0.35rem 0.5rem", borderRadius: controlRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface-raised)", color: "var(--text)", fontSize: "12px", fontFamily: "var(--font-mono)", zIndex: 2 }}
-              />
-            )}
-            {!sourceUrl && (
-              <div style={{ position: "absolute", inset: "1rem", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
-                  <div style={{ width: "48px", height: "48px", margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.05)" }}>
-                    <span style={{ color: "rgba(255,255,255,0.8)" }}><Icon name="upload" className="size-5" /></span>
-                  </div>
-                  <p style={{ fontSize: "14px", fontWeight: "600", marginBottom: "0.5rem" }}>
-                    {isDraggingFile ? "Drop the image to review" : "Choose a de-identified image"}
-                  </p>
-                  <p style={{ fontSize: "12px", opacity: 0.7 }}>Local tools run in your browser; provider review is opt-in. Drag &amp; drop works too.</p>
+          {compareMode ? (
+            <div ref={canvasWrapperRef} style={{ position: "relative", backgroundColor: "#131518", padding: "1rem", aspectRatio: isFullscreen || isPhone ? "auto" : "4/3", flex: isFullscreen ? "1 1 auto" : undefined, minHeight: isFullscreen ? 0 : undefined, display: "flex", flexDirection: isPhone ? "column" : "row", gap: "1rem" }}>
+              {/* Current pane — the active workspace (annotations + measurements stay here) */}
+              <div style={{ position: "relative", minWidth: 0, minHeight: 0, flex: isPhone && !isFullscreen ? "none" : "1 1 0%", aspectRatio: isPhone && !isFullscreen ? "4/3" : "auto", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingBottom: "0.5rem", color: "rgba(255,255,255,0.9)", fontSize: "11px", fontWeight: "600", flexShrink: 0 }}>
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
+                  <span>Current</span>
+                  <span style={{ opacity: 0.55, fontWeight: 400, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file?.name ?? "No image selected"}</span>
+                </div>
+                <div style={{ position: "relative", flex: "1 1 0%", minHeight: 0 }}>
+                  <canvas ref={canvasRef} style={{ width: "100%", height: "100%", borderRadius: "calc(var(--radius-base) - 4px)", display: "block", touchAction: "none", cursor: CURSOR_FOR_TOOL[activeTool] }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onPointerLeave={() => { if (!dragOrigin && !draft) setSample(null); if (!draft) setAnglePreview(null); }} aria-label="Current image viewer. Drag to pan; move pointer for pixel intensity." />
+                  <canvas ref={overlayRef} style={{ position: "absolute", inset: 0, borderRadius: "calc(var(--radius-base) - 4px)", pointerEvents: "none" }} aria-hidden="true" />
+                  {pendingText && textInputPos && (
+                    <input
+                      autoFocus
+                      value={pendingText.value}
+                      onChange={(event) => setPendingText((current) => current ? { ...current, value: event.target.value } : current)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") { event.preventDefault(); commitText(); }
+                        if (event.key === "Escape") { event.preventDefault(); cancelText(); }
+                      }}
+                      onBlur={commitText}
+                      placeholder="Label text, then Enter ↵"
+                      maxLength={120}
+                      aria-label="Annotation text"
+                      style={{ position: "absolute", left: textInputPos.x, top: textInputPos.y, width: "160px", padding: "0.35rem 0.5rem", borderRadius: controlRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface-raised)", color: "var(--text)", fontSize: "12px", fontFamily: "var(--font-mono)", zIndex: 2 }}
+                    />
+                  )}
+                  {!sourceUrl && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                      <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+                        <div style={{ width: "48px", height: "48px", margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.05)" }}>
+                          <span style={{ color: "rgba(255,255,255,0.8)" }}><Icon name="upload" className="size-5" /></span>
+                        </div>
+                        <p style={{ fontSize: "14px", fontWeight: "600", marginBottom: "0.5rem" }}>
+                          {isDraggingFile ? "Drop the image to review" : "Choose a de-identified image"}
+                        </p>
+                        <p style={{ fontSize: "12px", opacity: 0.7 }}>Local tools run in your browser; provider review is opt-in. Drag &amp; drop works too.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
+              {/* Previous pane — view only (pan drives the shared zoom/pan, no annotations) */}
+              <div
+                style={{ position: "relative", minWidth: 0, minHeight: 0, flex: isPhone && !isFullscreen ? "none" : "1 1 0%", aspectRatio: isPhone && !isFullscreen ? "4/3" : "auto", display: "flex", flexDirection: "column" }}
+                onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); setCompareIsDragging(true); }}
+                onDragLeave={(event) => { if (event.currentTarget === event.target) setCompareIsDragging(false); }}
+                onDrop={handleCompareDrop}
+                onDragEnd={() => setCompareIsDragging(false)}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingBottom: "0.5rem", color: "rgba(255,255,255,0.9)", fontSize: "11px", fontWeight: "600", flexShrink: 0 }}>
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#7dd3fc", flexShrink: 0 }} />
+                  <span>Previous</span>
+                  <span style={{ opacity: 0.55, fontWeight: 400, flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{compareFile?.name ?? "No previous image"}</span>
+                  {compareUrl && (
+                    <button type="button" onClick={rotateCompare90} className="pressable" aria-label="Rotate previous image 90°" title="Rotate previous image 90°" style={{ width: "24px", height: "24px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid rgba(255,255,255,0.25)", borderRadius: "6px", color: "rgba(255,255,255,0.85)", cursor: "pointer", flexShrink: 0 }}>
+                      <Icon name="rotate" className="size-3.5" />
+                    </button>
+                  )}
+                  {compareUrl && (
+                    <button type="button" onClick={removeCompareImage} className="pressable" aria-label="Remove previous image" title="Remove previous image" style={{ width: "24px", height: "24px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid rgba(255,255,255,0.25)", borderRadius: "6px", color: "rgba(255,255,255,0.85)", cursor: "pointer", flexShrink: 0 }}>
+                      <Icon name="x" className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div style={{ position: "relative", flex: "1 1 0%", minHeight: 0 }}>
+                  <canvas ref={compareCanvasRef} style={{ width: "100%", height: "100%", borderRadius: "calc(var(--radius-base) - 4px)", display: "block", touchAction: "none", cursor: "grab" }} onPointerDown={handleComparePointerDown} onPointerMove={handleComparePointerMove} onPointerUp={handleComparePointerUp} onPointerCancel={handleComparePointerCancel} aria-label="Previous image viewer. Drag to pan both panes together." />
+                  {!compareUrl && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: `1px dashed ${compareIsDragging ? "var(--accent)" : "rgba(255,255,255,0.25)"}`, borderRadius: "calc(var(--radius-base) - 4px)", backgroundColor: compareIsDragging ? "rgba(255,255,255,0.06)" : "transparent" }} onClick={() => compareInputRef.current?.click()}>
+                      <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)", padding: "1rem" }}>
+                        <p style={{ fontSize: "13px", fontWeight: "600", marginBottom: "0.4rem" }}>{compareIsDragging ? "Drop the previous image" : "Load previous image"}</p>
+                        <p style={{ fontSize: "11px", opacity: 0.7, margin: 0 }}>PNG · JPEG · WebP — the reference pane is view-only.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div ref={canvasWrapperRef} style={{ position: "relative", backgroundColor: "#131518", padding: "1rem", aspectRatio: isFullscreen ? "auto" : "4/3", flex: isFullscreen ? "1 1 auto" : undefined, minHeight: isFullscreen ? 0 : undefined }}>
+              <canvas ref={canvasRef} style={{ width: "100%", height: "100%", borderRadius: "calc(var(--radius-base) - 4px)", display: "block", touchAction: "none", cursor: CURSOR_FOR_TOOL[activeTool] }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onPointerLeave={() => { if (!dragOrigin && !draft) setSample(null); if (!draft) setAnglePreview(null); }} aria-label="Image viewer. Drag to pan; move pointer for pixel intensity." />
+              <canvas ref={overlayRef} style={{ position: "absolute", inset: "1rem", borderRadius: "calc(var(--radius-base) - 4px)", pointerEvents: "none" }} aria-hidden="true" />
+              {pendingText && textInputPos && (
+                <input
+                  autoFocus
+                  value={pendingText.value}
+                  onChange={(event) => setPendingText((current) => current ? { ...current, value: event.target.value } : current)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") { event.preventDefault(); commitText(); }
+                    if (event.key === "Escape") { event.preventDefault(); cancelText(); }
+                  }}
+                  onBlur={commitText}
+                  placeholder="Label text, then Enter ↵"
+                  maxLength={120}
+                  aria-label="Annotation text"
+                  style={{ position: "absolute", left: textInputPos.x, top: textInputPos.y, width: "160px", padding: "0.35rem 0.5rem", borderRadius: controlRadius, border: "1px solid var(--border)", backgroundColor: "var(--surface-raised)", color: "var(--text)", fontSize: "12px", fontFamily: "var(--font-mono)", zIndex: 2 }}
+                />
+              )}
+              {!sourceUrl && (
+                <div style={{ position: "absolute", inset: "1rem", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                  <div style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+                    <div style={{ width: "48px", height: "48px", margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.05)" }}>
+                      <span style={{ color: "rgba(255,255,255,0.8)" }}><Icon name="upload" className="size-5" /></span>
+                    </div>
+                    <p style={{ fontSize: "14px", fontWeight: "600", marginBottom: "0.5rem" }}>
+                      {isDraggingFile ? "Drop the image to review" : "Choose a de-identified image"}
+                    </p>
+                    <p style={{ fontSize: "12px", opacity: 0.7 }}>Local tools run in your browser; provider review is opt-in. Drag &amp; drop works too.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Measurement readout */}
           {hasMeasurements && (
@@ -1611,6 +1829,7 @@ export default function ImagingWorkspace() {
               <Icon name="upload" className="size-4" />{file ? "Replace" : "Choose image"}
             </button>
             <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event: ChangeEvent<HTMLInputElement>) => loadFile(event.target.files?.[0])} style={{ display: "none" }} />
+            <input ref={compareInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event: ChangeEvent<HTMLInputElement>) => loadCompareFile(event.target.files?.[0])} style={{ display: "none" }} />
           </div>
         </div>
 
