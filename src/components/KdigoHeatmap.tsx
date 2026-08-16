@@ -79,7 +79,7 @@ export function KdigoHeatmap({ g, a }: { g?: GfrStage; a?: AlbStage }) {
                         </span>
                       </span>
                     ) : (
-                      <span className="text-[11px] font-medium leading-none opacity-70">
+                      <span className="text-[11px] font-medium leading-none">
                         {visits}×/yr
                       </span>
                     )}

@@ -96,3 +96,49 @@ No console errors, no failed HTTP responses on any route.
   then — low risk, but a screenshot eyeball in review is recommended.
 - `INP` was null (no user interaction during the vitals window).
 - Print PDF is structural-only (no visual check).
+---
+
+## Fix verification (re-run 2026-08-16 ~10:35-10:39 UTC, post-fix build)
+
+Re-run scope per coordinator: axe `color-contrast` + `aria-prohibited-attr` on
+`/`, `/calculator`, `/imaging`, `/tools`; fresh vitals; screenshots
+`research/shots/fix-home.png`, `research/shots/fix-imaging.png`. App code was
+not touched during this pass. Full axe JSON saved as `research/shots/axe-fix-*.json`.
+
+### Defect-by-defect results
+
+| Defect | Result | Evidence |
+|---|---|---|
+| 1. Contrast tokens (accent 0.52, accent-strong 0.48, very-high 0.5) | **PARTIAL — one FAIL remains** | `/`, `/imaging`, `/tools`: 0 contrast violations (previously 12 + 2 nodes). **FAIL: `/calculator` — 8 nodes**, all in the KDIGO heatmap "very-high" cells; measured **4.32:1** vs required 4.5:1 (axe: foreground `#514447`, background `#d8a5a1`, 11px normal). Exact selectors (all same shape): cells on rows 3-6 with class `bg-very-high/45` containing the `opacity-70 leading-none text-[11px]` span (the `x/yr` label). Root cause: the darkening of `--very-high` made the cell fill darker while the non-active label keeps `opacity-70` (`KdigoHeatmap.tsx:83`). Suggested fix (integrator): raise that span's opacity to about 0.85+ or drop opacity on very-high cells, then re-run axe |
+| 2. aria-label on generic div ("Live signals") | **PASS** | `role="group"` present; 0 `aria-prohibited-attr` violations on all 4 routes |
+| 3. Poster to WebP | **PASS** | desktop-poster.webp 39,328 B and mobile-poster.webp 36,404 B on disk AND over the wire (Content-Length 39328, image/webp); PNGs 404 (deleted); refs updated in `HeroVideo.tsx:27,29,43` and `KidneyScene.tsx:8` |
+| 4. LCP (poster weight) | **PASS / monitor** | LCP element is now the webp poster; fresh reading LCP **1,800 ms**, FCP 1,168 ms, TTFB 41 ms, CLS 0.0 (all within "good"; earlier run read 1,244 ms — cold-start variance, still under 2.5 s). The vitals tool's reported size 723,200 is the decoded bitmap size, not transfer (wire = 39 KB) |
+
+### New finding surfaced by this audit
+
+- **[critical] `/imaging` — 2 unlabeled range inputs** (axe rule `label`, 2
+  nodes): `div:nth-child(2) > input[type=range][min=20][max=200]` and
+  `div:nth-child(3) > input[type=range][min=20][max=200]` — no implicit or
+  explicit label, no aria-label/aria-labelledby. These are the image viewer
+  adjustment sliders. Honest note: this was very likely present in the previous
+  run too and was omitted from my summary because the axe output I printed was
+  truncated to the color-contrast violation; it is confirmed now with exact
+  selectors. Fix: add aria-label (e.g. "Brightness", "Contrast") to both.
+
+### Remaining axe `incomplete` (manual review — NOT violations)
+
+- Color-contrast incomplete on all 4 routes (axe cannot resolve translucent
+  backgrounds): nav `text-slate-500` links over the surface/80 + blur header,
+  logo `sm:inline`, homepage h1/slate-500 accent span, muted small-text rows.
+  Recommendation: manual spot-check in DevTools; slate-500 on slate-50/white
+  about 4.6-4.9:1 and muted at 0.45 about 5.8-6.9:1 (per coordinator's
+  measurement) — likely fine, not confirmed by axe.
+
+### Visual confirmation
+
+- `research/shots/fix-home.png`, `research/shots/fix-imaging.png` captured.
+- Tokens verified programmatically on the live page: accent = oklch(52% .14 46),
+  accent-strong = oklch(48% .13 44), very-high = oklch(50% .15 28), muted =
+  oklch(45% .013 250) — the darker accent is applied in computed styles. This
+  run has no vision, so the "looks intentional" judgment needs a human/vision
+  pass over the two screenshots.

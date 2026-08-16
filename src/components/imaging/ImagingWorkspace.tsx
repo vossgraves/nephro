@@ -1625,7 +1625,7 @@ export default function ImagingWorkspace() {
                 <span>Brightness</span>
                 <span style={{ opacity: 0.6, fontFamily: "var(--font-mono)" }}>{brightness}%</span>
               </div>
-              <input type="range" min="20" max="200" value={brightness} onChange={(event) => setBrightness(+event.target.value)} style={{ width: "100%", background: `linear-gradient(to right, ${accent} ${(brightness - 20) / 1.8}%, var(--border) ${(brightness - 20) / 1.8}%)` }} />
+              <input type="range" aria-label="Brightness" min="20" max="200" value={brightness} onChange={(event) => setBrightness(+event.target.value)} style={{ width: "100%", background: `linear-gradient(to right, ${accent} ${(brightness - 20) / 1.8}%, var(--border) ${(brightness - 20) / 1.8}%)` }} />
             </div>
 
             {/* Contrast */}
@@ -1634,7 +1634,7 @@ export default function ImagingWorkspace() {
                 <span>Contrast</span>
                 <span style={{ opacity: 0.6, fontFamily: "var(--font-mono)" }}>{contrast}%</span>
               </div>
-              <input type="range" min="20" max="200" value={contrast} onChange={(event) => setContrast(+event.target.value)} style={{ width: "100%", background: `linear-gradient(to right, ${accent} ${(contrast - 20) / 1.8}%, var(--border) ${(contrast - 20) / 1.8}%)` }} />
+              <input type="range" aria-label="Contrast" min="20" max="200" value={contrast} onChange={(event) => setContrast(+event.target.value)} style={{ width: "100%", background: `linear-gradient(to right, ${accent} ${(contrast - 20) / 1.8}%, var(--border) ${(contrast - 20) / 1.8}%)` }} />
             </div>
 
             {/* Toggles */}
