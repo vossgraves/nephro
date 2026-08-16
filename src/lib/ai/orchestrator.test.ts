@@ -51,9 +51,6 @@ const geminiAnalysisOk = (payload: unknown): Response =>
 const geminiAnalysisTextOk = (text: string): Response =>
   jsonResponse({ candidates: [{ content: { parts: [{ text }] } }] });
 
-const geminiChatOk = (answer: string): Response =>
-  jsonResponse({ candidates: [{ content: { parts: [{ text: answer }] } }] });
-
 const openaiAnalysisOk = (payload: unknown): Response =>
   jsonResponse({ choices: [{ message: { content: JSON.stringify(payload) } }] });
 
