@@ -131,3 +131,6 @@ export default async function RecordsPage() {
     </div>
   );
 }
+
+// Records reflect live database state; never prerender this page statically.
+export const dynamic = "force-dynamic";

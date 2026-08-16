@@ -1,0 +1,122 @@
+{
+  "log": {
+    "browser": {
+      "name": "Chrome",
+      "version": "151.0.7922.137"
+    },
+    "creator": {
+      "name": "agent-browser",
+      "version": "0.34.0"
+    },
+    "entries": [
+      {
+        "_resourceType": "Fetch",
+        "cache": {},
+        "request": {
+          "bodySize": 2808,
+          "cookies": [],
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Referer",
+              "value": "https://nephro-mnjh2hpp5-mhsmdactcs-projects.vercel.app/imaging"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Chromium\";v=\"151\", \"Not=A?Brand\";v=\"99\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            },
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Linux\""
+            }
+          ],
+          "headersSize": -1,
+          "httpVersion": "HTTP/2.0",
+          "method": "POST",
+          "postData": {
+            "mimeType": "application/json",
+            "text": "{\"modality\":\"ultrasound\",\"imageDataUrl\":\"data:image/png;base64,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\",\"clinicalQuestion\":\"\",\"deidentifiedConfirmed\":true}"
+          },
+          "queryString": [],
+          "url": "https://nephro-mnjh2hpp5-mhsmdactcs-projects.vercel.app/api/imaging/analyze"
+        },
+        "response": {
+          "bodySize": 378,
+          "content": {
+            "mimeType": "application/json",
+            "size": 378,
+            "text": "{\"error\":\"Provider API keys are being rejected. Check the GEMINI_API_KEY and OPENAI_API_KEY environment variables in Vercel.\",\"code\":\"BOTH_PROVIDERS_FAILED\",\"providerDetails\":[\"gemini: model unavailable (check the model name)\",\"openai: API key rejected (check the configured key)\"]}"
+          },
+          "cookies": [],
+          "headers": [
+            {
+              "name": "cache-control",
+              "value": "no-store, max-age=0"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "date",
+              "value": "Sun, 16 Aug 2026 10:48:36 GMT"
+            },
+            {
+              "name": "server",
+              "value": "Vercel"
+            },
+            {
+              "name": "strict-transport-security",
+              "value": "max-age=63072000; includeSubDomains; preload"
+            },
+            {
+              "name": "vary",
+              "value": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch"
+            },
+            {
+              "name": "x-matched-path",
+              "value": "/api/imaging/analyze"
+            },
+            {
+              "name": "x-robots-tag",
+              "value": "noindex"
+            },
+            {
+              "name": "x-vercel-cache",
+              "value": "MISS"
+            },
+            {
+              "name": "x-vercel-id",
+              "value": "bom1::iad1::hdz7r-1786877316256-b640be57bdf7"
+            }
+          ],
+          "headersSize": -1,
+          "httpVersion": "HTTP/2.0",
+          "redirectURL": "",
+          "status": 503,
+          "statusText": ""
+        },
+        "startedDateTime": "2026-08-16T10:48:35.399041024Z",
+        "time": 808.1619999558106,
+        "timings": {
+          "blocked": 13.766,
+          "receive": 32.45199995581061,
+          "send": 18.899,
+          "wait": 743.0450000000001
+        }
+      }
+    ],
+    "version": "1.2"
+  }
+}

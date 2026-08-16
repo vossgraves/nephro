@@ -1,0 +1,150 @@
+{
+  "log": {
+    "browser": {
+      "name": "Chrome",
+      "version": "151.0.7922.137"
+    },
+    "creator": {
+      "name": "agent-browser",
+      "version": "0.34.0"
+    },
+    "entries": [
+      {
+        "_resourceType": "Fetch",
+        "cache": {},
+        "request": {
+          "bodySize": 712,
+          "cookies": [],
+          "headers": [
+            {
+              "name": "Accept",
+              "value": "text/x-component"
+            },
+            {
+              "name": "Content-Type",
+              "value": "text/plain;charset=UTF-8"
+            },
+            {
+              "name": "Referer",
+              "value": "https://nephro-mnjh2hpp5-mhsmdactcs-projects.vercel.app/calculator"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "next-action",
+              "value": "4088227ee23067135c42d3728644e2924543b0f2f1"
+            },
+            {
+              "name": "next-router-state-tree",
+              "value": "%5B%22%22%2C%7B%22children%22%3A%5B%22calculator%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%2Ctrue%5D"
+            },
+            {
+              "name": "sec-ch-ua",
+              "value": "\"Chromium\";v=\"151\", \"Not=A?Brand\";v=\"99\""
+            },
+            {
+              "name": "sec-ch-ua-mobile",
+              "value": "?0"
+            },
+            {
+              "name": "sec-ch-ua-platform",
+              "value": "\"Linux\""
+            }
+          ],
+          "headersSize": -1,
+          "httpVersion": "HTTP/2.0",
+          "method": "POST",
+          "postData": {
+            "mimeType": "text/plain;charset=UTF-8",
+            "text": "[{\"patientName\":\"Unnamed patient\",\"age\":58,\"sex\":\"female\",\"scrMgDl\":1.4,\"uacrMgG\":180,\"region\":\"other\",\"egfr\":43.608828683085605,\"gfrStage\":\"G3b\",\"albStage\":\"A2\",\"kdigoRisk\":\"very-high\",\"kfre2yr\":0.008573777504375157,\"kfre5yr\":0.0327928626111087,\"crcl\":48.40277777777778,\"guidance\":[\"Confirm chronicity: repeat eGFR and uACR at >=3 months before diagnosing CKD.\",\"ACE inhibitor or ARB titrated to the maximum tolerated dose (KDIGO 2024).\",\"Monitor at least three times yearly; nephrology referral indicated.\",\"5-year KFRE 3–5%: consider nephrology referral.\",\"Recheck uACR after treatment changes; a sustained doubling of ACR warrants re-evaluation.\",\"Avoid NSAIDs; review and renally dose all medications.\"]}]"
+          },
+          "queryString": [],
+          "url": "https://nephro-mnjh2hpp5-mhsmdactcs-projects.vercel.app/calculator"
+        },
+        "response": {
+          "bodySize": 242,
+          "content": {
+            "mimeType": "text/x-component",
+            "size": 242,
+            "text": "0:{\"a\":\"$@1\",\"f\":\"\",\"b\":\"65W019W3N0ZdPOGzVLSg7\"}\n1:{\"ok\":false,\"error\":\"Database not configured (DATABASE_URL missing).\"}\n"
+          },
+          "cookies": [],
+          "headers": [
+            {
+              "name": "age",
+              "value": "0"
+            },
+            {
+              "name": "cache-control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "name": "content-encoding",
+              "value": "br"
+            },
+            {
+              "name": "content-type",
+              "value": "text/x-component"
+            },
+            {
+              "name": "date",
+              "value": "Sun, 16 Aug 2026 10:52:57 GMT"
+            },
+            {
+              "name": "server",
+              "value": "Vercel"
+            },
+            {
+              "name": "strict-transport-security",
+              "value": "max-age=63072000; includeSubDomains; preload"
+            },
+            {
+              "name": "vary",
+              "value": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch"
+            },
+            {
+              "name": "x-action-revalidated",
+              "value": "[[],0,0]"
+            },
+            {
+              "name": "x-matched-path",
+              "value": "/calculator"
+            },
+            {
+              "name": "x-nextjs-prerender",
+              "value": "1"
+            },
+            {
+              "name": "x-robots-tag",
+              "value": "noindex"
+            },
+            {
+              "name": "x-vercel-cache",
+              "value": "BYPASS"
+            },
+            {
+              "name": "x-vercel-id",
+              "value": "bom1::iad1::nt5jz-1786877577151-3274380ee766"
+            }
+          ],
+          "headersSize": -1,
+          "httpVersion": "HTTP/2.0",
+          "redirectURL": "",
+          "status": 200,
+          "statusText": ""
+        },
+        "startedDateTime": "2026-08-16T10:52:56.306627072Z",
+        "time": 316.63300003531947,
+        "timings": {
+          "blocked": 9.998,
+          "receive": 6.724000035319477,
+          "send": 21.128,
+          "wait": 278.783
+        }
+      }
+    ],
+    "version": "1.2"
+  }
+}
