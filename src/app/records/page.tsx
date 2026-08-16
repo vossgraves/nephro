@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { isDbConfigured, listRecords, type RecordRow } from "@/lib/db";
 import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
+import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { removeRecord } from "./actions";
 
 function exportCsv(records: RecordRow[]) {
@@ -88,21 +89,7 @@ export default async function RecordsPage() {
           </p>
         </div>
         {records.length > 0 ? (
-          <button
-            type="button"
-            className="pressable rounded-[calc(var(--radius-base)-2px)] border border-border bg-bg/60 px-3 py-2 text-xs font-semibold transition-colors hover:border-accent"
-            onClick={() => {
-              const blob = new Blob([exportCsv(records)], { type: "text/csv;charset=utf-8" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `nephro-records-${new Date().toISOString().slice(0, 10)}.csv`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-          >
-            Export CSV ({records.length})
-          </button>
+          <ExportCsvButton csv={exportCsv(records)} count={records.length} />
         ) : null}
       </div>
 
