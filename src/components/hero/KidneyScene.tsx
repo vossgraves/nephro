@@ -1,8 +1,11 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
+import { getPerfConfig, PARTICLE_CAP, type PerfConfig } from "@/components/hero/perf-tier";
+
+const POSTER_SRC = "/media/nephro-kidney-tablet-desktop-poster.png";
 
 const TEAL = new THREE.Color("#a8441c");
 const GREEN = new THREE.Color("#d97b45");
@@ -79,6 +82,7 @@ const FRAGMENT = /* glsl */ `
   uniform vec3 uColorA;
   uniform vec3 uColorB;
   uniform vec3 uRim;
+  uniform float uPulse;
   varying vec3 vNormal;
   varying vec3 vPos;
   varying float vDisp;
@@ -87,7 +91,7 @@ const FRAGMENT = /* glsl */ `
     vec3 viewDir = normalize(cameraPosition - vPos);
     float fresnel = pow(1.0 - clamp(dot(viewDir, normalize(vNormal)), 0.0, 1.0), 2.5);
     vec3 base = mix(uColorA, uColorB, clamp(vDisp * 1.6, 0.0, 1.0));
-    vec3 col = base + uRim * fresnel * (0.52 + 0.22 * sin(uTime * 1.5));
+    vec3 col = base + uRim * fresnel * (0.52 + uPulse * sin(uTime * 1.5));
     float alpha = 0.8 + 0.18 * fresnel;
     gl_FragColor = vec4(col, alpha);
   }
@@ -118,6 +122,11 @@ const PARTICLE_FRAG = /* glsl */ `
   }
 `;
 
+const RIPPLE_RADIUS = 1.5;
+const RIPPLE_STRENGTH = 3.0;
+const RIPPLE_SPRING = 12;
+const RIPPLE_DAMPING = 2.5;
+
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
 
@@ -132,7 +141,55 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
-function KidneyCore({ reduced }: { reduced: boolean }) {
+/**
+ * three r163+ is WebGL2-only, so the probe requires a WebGL2 context. Any
+ * failure (GPU blocklist, disabled hardware acceleration, headless embed)
+ * routes to the poster fallback instead of a blank canvas.
+ */
+function supportsWebGL(): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  if (typeof WebGL2RenderingContext === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    return canvas.getContext("webgl2") !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Catches any render-time error from the R3F tree (shader compile, context
+ * creation, driver fallout) so the page can never be blanked by the scene.
+ */
+class SceneErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { failed: boolean }
+> {
+  state: { failed: boolean } = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function PosterFrame() {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- static emergency fallback rendered only when WebGL is unavailable; next/image optimization is irrelevant here
+    <img
+      src={POSTER_SRC}
+      alt=""
+      className="h-full w-full object-cover object-[62%_center] md:object-center"
+      loading="eager"
+      decoding="async"
+    />
+  );
+}
+
+function KidneyCore({ reduced, animateFresnel }: { reduced: boolean; animateFresnel: boolean }) {
   const mesh = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
   const follow = useRef({ x: 0, y: 0 });
@@ -144,12 +201,16 @@ function KidneyCore({ reduced }: { reduced: boolean }) {
       uColorA: { value: TEAL },
       uColorB: { value: GREEN },
       uRim: { value: RIM },
+      uPulse: { value: 0 },
     }),
     [],
   );
 
   useFrame((state, delta) => {
-    if (material.current) material.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
+    if (material.current) {
+      material.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
+      material.current.uniforms.uPulse.value = animateFresnel && !reduced ? 0.22 : 0;
+    }
     if (!mesh.current || reduced) return;
 
     const smoothing = 1 - Math.exp(-4 * delta);
@@ -249,25 +310,42 @@ function OrbitSystem({ reduced }: { reduced: boolean }) {
 function Particles({ count = 280, reduced }: { count?: number; reduced: boolean }) {
   const points = useRef<THREE.Points>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
+  const geometry = useRef<THREE.BufferGeometry>(null);
 
-  const positions = useMemo(() => {
-    const values = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
+  // Interaction state: the ripple is active while the pointer is pressed.
+  const pointer = useRef({ down: false, world: new THREE.Vector3() });
+  const scratch = useRef({ inv: new THREE.Matrix4(), local: new THREE.Vector3() });
+
+  const effectiveCount = useMemo(
+    () => Math.min(PARTICLE_CAP, Math.max(0, Math.round(count))),
+    [count],
+  );
+
+  const arrays = useMemo(() => {
+    const n = effectiveCount;
+    const base = new Float32Array(n * 3);
+    const live = new Float32Array(n * 3);
+    const velocity = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
       const radius = 2.7 + Math.random() * 3.1;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      values[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-      values[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-      values[i * 3 + 2] = radius * Math.cos(phi);
+      const i3 = i * 3;
+      base[i3] = radius * Math.sin(phi) * Math.cos(theta);
+      base[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      base[i3 + 2] = radius * Math.cos(phi);
+      live[i3] = base[i3];
+      live[i3 + 1] = base[i3 + 1];
+      live[i3 + 2] = base[i3 + 2];
     }
-    return values;
-  }, [count]);
+    return { base, live, velocity };
+  }, [effectiveCount]);
 
   const phases = useMemo(() => {
-    const values = new Float32Array(count);
-    for (let i = 0; i < count; i++) values[i] = Math.random() * Math.PI * 2;
+    const values = new Float32Array(effectiveCount);
+    for (let i = 0; i < effectiveCount; i++) values[i] = Math.random() * Math.PI * 2;
     return values;
-  }, [count]);
+  }, [effectiveCount]);
 
   const uniforms = useMemo(
     () => ({
@@ -278,16 +356,65 @@ function Particles({ count = 280, reduced }: { count?: number; reduced: boolean 
   );
 
   useFrame((state, delta) => {
-    if (material.current) material.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
-    if (!points.current || reduced) return;
-    points.current.rotation.y += delta * 0.016;
-    points.current.rotation.x += Math.sin(state.clock.elapsedTime * 0.1) * delta * 0.008;
+    if (material.current) {
+      material.current.uniforms.uTime.value = reduced ? 0.6 : state.clock.elapsedTime;
+    }
+    const pts = points.current;
+    const geom = geometry.current;
+    if (!pts || !geom || reduced) return;
+
+    pts.rotation.y += delta * 0.016;
+    pts.rotation.x += Math.sin(state.clock.elapsedTime * 0.1) * delta * 0.008;
+    // Keep matrixWorld current so the pointer position maps into local space.
+    pts.updateMatrixWorld();
+
+    const { base, live, velocity } = arrays;
+    const damp = Math.exp(-RIPPLE_DAMPING * delta);
+    const spring = RIPPLE_SPRING * delta;
+
+    if (pointer.current.down) {
+      const { inv, local } = scratch.current;
+      inv.copy(pts.matrixWorld).invert();
+      local.copy(pointer.current.world).applyMatrix4(inv);
+      const px = local.x;
+      const py = local.y;
+      const pz = local.z;
+      for (let i = 0; i < effectiveCount; i++) {
+        const i3 = i * 3;
+        const dx = live[i3] - px;
+        const dy = live[i3 + 1] - py;
+        const dz = live[i3 + 2] - pz;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist >= RIPPLE_RADIUS || dist === 0) continue;
+        const falloff = 1 - dist / RIPPLE_RADIUS;
+        const push = RIPPLE_STRENGTH * falloff * falloff * delta;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const nz = dz / dist;
+        velocity[i3] += nx * push;
+        velocity[i3 + 1] += ny * push;
+        velocity[i3 + 2] += nz * push;
+      }
+    }
+
+    // Damped spring-back toward the resting positions for every particle.
+    for (let i = 0; i < effectiveCount; i++) {
+      const i3 = i * 3;
+      for (let c = 0; c < 3; c++) {
+        const k = i3 + c;
+        velocity[k] += (base[k] - live[k]) * spring;
+        velocity[k] *= damp;
+        live[k] += velocity[k] * delta;
+      }
+    }
+
+    geom.attributes.position.needsUpdate = true;
   });
 
   return (
     <points ref={points}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      <bufferGeometry ref={geometry}>
+        <bufferAttribute attach="attributes-position" args={[arrays.live, 3]} />
         <bufferAttribute attach="attributes-aPhase" args={[phases, 1]} />
       </bufferGeometry>
       <shaderMaterial
@@ -299,20 +426,40 @@ function Particles({ count = 280, reduced }: { count?: number; reduced: boolean 
         depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
+      {/* Invisible capture surface so the pointer-repel ripple works anywhere
+          over the hero canvas, including drags across empty space. */}
+      <mesh
+        onPointerDown={(event) => {
+          pointer.current.down = true;
+          pointer.current.world.copy(event.point);
+        }}
+        onPointerMove={(event) => {
+          if (pointer.current.down) pointer.current.world.copy(event.point);
+        }}
+        onPointerUp={() => {
+          pointer.current.down = false;
+        }}
+        onPointerLeave={() => {
+          pointer.current.down = false;
+        }}
+      >
+        <sphereGeometry args={[5.4, 12, 12]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
     </points>
   );
 }
 
-function Scene() {
+function Scene({ config }: { config: PerfConfig }) {
   const reduced = useReducedMotion();
   const viewport = useThree((state) => state.viewport);
   const wide = viewport.width >= 7.2;
 
   return (
     <group position={[wide ? 1.42 : 0.08, 0, 0]} scale={wide ? 1 : 0.76}>
-      <KidneyCore reduced={reduced} />
+      <KidneyCore reduced={reduced} animateFresnel={config.animateFresnel} />
       <OrbitSystem reduced={reduced} />
-      <Particles reduced={reduced} />
+      <Particles count={config.particles} reduced={reduced} />
     </group>
   );
 }
@@ -320,6 +467,9 @@ function Scene() {
 export default function KidneyScene({ className = "absolute inset-0" }: { className?: string }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
+  const [webgl] = useState<boolean>(() => supportsWebGL());
+  const [contextLost, setContextLost] = useState(false);
+  const config = useMemo(() => getPerfConfig(), []);
 
   useEffect(() => {
     const element = wrap.current;
@@ -334,15 +484,25 @@ export default function KidneyScene({ className = "absolute inset-0" }: { classN
 
   return (
     <div ref={wrap} className={className} aria-hidden="true">
-      <Canvas
-        frameloop={visible ? "always" : "never"}
-        camera={{ position: [0, 0, 5.8], fov: 45 }}
-        gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-        dpr={[1, 1.5]}
-        style={{ touchAction: "none" }}
-      >
-        <Scene />
-      </Canvas>
+      {webgl && !contextLost ? (
+        <SceneErrorBoundary fallback={<PosterFrame />}>
+          <Canvas
+            frameloop={visible ? "always" : "never"}
+            camera={{ position: [0, 0, 5.8], fov: 45 }}
+            gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+            dpr={[1, config.maxDpr]}
+            style={{ touchAction: "none" }}
+            onCreated={({ gl }) => {
+              const onLost = () => setContextLost(true);
+              gl.domElement.addEventListener("webglcontextlost", onLost);
+            }}
+          >
+            <Scene config={config} />
+          </Canvas>
+        </SceneErrorBoundary>
+      ) : (
+        <PosterFrame />
+      )}
     </div>
   );
 }

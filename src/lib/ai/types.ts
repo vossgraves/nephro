@@ -38,7 +38,17 @@ export type VisionAnalysis = {
 export type ChatInput = VisionInput & {
   question: string;
   priorReport?: RecognitionReport;
+  /** Pre-built chat system prompt injected by the orchestrator. Falls back to CHAT_SYSTEM_PROMPT_FALLBACK when absent. */
+  systemPrompt?: string;
 };
+
+/**
+ * Minimal chat system prompt used when a provider is called without an
+ * orchestrator-built prompt. The orchestrator always injects a richer prompt
+ * that embeds modality guidance and the prior report when present.
+ */
+export const CHAT_SYSTEM_PROMPT_FALLBACK =
+  "Answer the user's question about the provided medical image in plain text, staying strictly within non-diagnostic visual-review boundaries. Never diagnose. Keep the answer under 300 words.";
 
 export type ChatAnswer = {
   answer: string;

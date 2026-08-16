@@ -140,10 +140,22 @@ export function parseJsonObject(text: string): unknown {
     return JSON.parse(trimmed);
   } catch {
     const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1];
-    if (fenced) return JSON.parse(fenced);
+    if (fenced) {
+      try {
+        return JSON.parse(fenced);
+      } catch {
+        // fall through to the embedded-object attempt
+      }
+    }
     const start = trimmed.indexOf("{");
     const end = trimmed.lastIndexOf("}");
-    if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1));
+      } catch {
+        // fall through to the user-safe error below
+      }
+    }
     throw new Error("The provider returned an unreadable analysis response.");
   }
 }

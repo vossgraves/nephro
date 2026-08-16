@@ -1,9 +1,5 @@
-import {
-  MAX_ANALYSIS_FILE_BYTES,
-  type ImagingModality,
-  type RecognitionProvider,
-} from "@/lib/imaging-recognition";
-import { RequestValidationError, analyzeImage, validateImageDataUrl } from "@/lib/ai/orchestrator";
+import type { ImagingModality, RecognitionProvider, RecognitionReport } from "@/lib/imaging-recognition";
+import { RequestValidationError, chatAboutImage, validateImageDataUrl } from "@/lib/ai/orchestrator";
 import { checkRateLimit } from "@/lib/ai/rate-limit";
 import {
   ALLOWED_MODALITIES,
@@ -21,18 +17,12 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ANALYZE_RATE_LIMIT_PER_MINUTE = 6;
+const CHAT_RATE_LIMIT_PER_MINUTE = 20;
 
-export async function GET() {
-  const configured = configuredProviders();
-  return noStoreJson({
-    configured: {
-      openai: configured.includes("openai"),
-      gemini: configured.includes("gemini"),
-    },
-    maxImageBytes: MAX_ANALYSIS_FILE_BYTES,
-    privacy: "Images are sent to the selected configured provider only after client confirmation. The endpoint does not persist them.",
-  });
+function isPriorReport(value: unknown): value is RecognitionReport {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.summary === "string" && typeof record.safetyNote === "string";
 }
 
 export async function POST(request: Request) {
@@ -43,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   // Rate limit (in-memory sliding window, per IP).
-  if (!checkRateLimit(`analyze:${clientIp(request)}`, ANALYZE_RATE_LIMIT_PER_MINUTE, RATE_LIMIT_WINDOW_MS)) {
+  if (!checkRateLimit(`chat:${clientIp(request)}`, CHAT_RATE_LIMIT_PER_MINUTE, RATE_LIMIT_WINDOW_MS)) {
     return rateLimitedResponse();
   }
 
@@ -67,12 +57,20 @@ export async function POST(request: Request) {
   if (typeof record.imageDataUrl !== "string") {
     return noStoreJson({ error: "Choose an image before requesting a review." }, { status: 400 });
   }
+  const question = typeof record.question === "string" ? record.question.trim().slice(0, 600) : "";
+  if (!question) {
+    return noStoreJson({ error: "Ask a question about the image." }, { status: 400 });
+  }
   let provider: RecognitionProvider | undefined;
   if (record.provider !== undefined && record.provider !== null) {
     if (record.provider !== "openai" && record.provider !== "gemini") {
       return noStoreJson({ error: 'The provider field must be "openai" or "gemini".' }, { status: 400 });
     }
     provider = record.provider;
+  }
+  const priorReport = record.priorReport === undefined || record.priorReport === null ? undefined : record.priorReport;
+  if (priorReport !== undefined && !isPriorReport(priorReport)) {
+    return noStoreJson({ error: "priorReport must be a valid review report object." }, { status: 400 });
   }
   if (configuredProviders().length === 0) {
     return noStoreJson({
@@ -82,23 +80,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Payload-level image validation; violations map to 422 (as before).
     validateImageDataUrl(record.imageDataUrl);
-    const outcome = await analyzeImage({
+    const outcome = await chatAboutImage({
       imageDataUrl: record.imageDataUrl,
       modality: modality as ImagingModality,
-      clinicalQuestion: typeof record.clinicalQuestion === "string" ? record.clinicalQuestion.slice(0, 600) : undefined,
+      question,
+      priorReport,
       provider,
     });
     if (outcome.ok) {
-      return noStoreJson({ report: outcome.analysis.report });
+      return noStoreJson({
+        answer: outcome.result.answer,
+        provider: outcome.result.provider,
+        model: outcome.result.model,
+      });
     }
     return noStoreJson(failureResponseBody(outcome.failures), { status: 503 });
   } catch (error) {
     if (error instanceof RequestValidationError) {
       return noStoreJson({ error: error.message }, { status: 422 });
     }
-    console.error("Imaging analysis request failed unexpectedly", { error: error instanceof Error ? error.message : String(error) });
-    return noStoreJson({ error: error instanceof Error ? error.message : "Unexpected analysis error." }, { status: 422 });
+    console.error("Imaging chat request failed unexpectedly", { error: error instanceof Error ? error.message : String(error) });
+    return noStoreJson({ error: error instanceof Error ? error.message : "Unexpected chat error." }, { status: 422 });
   }
 }

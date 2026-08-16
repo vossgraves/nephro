@@ -24,6 +24,12 @@ GEMINI_API_KEY = AQ.Abxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 **Important:** These keys are server-side only. They will NOT appear in client-side code or browser requests.
 
+### Optional model overrides
+
+Defaults are `OPENAI_VISION_MODEL=gpt-5-mini` and `GEMINI_VISION_MODEL=gemini-2.5-flash`.
+Set these in Vercel only if you need a different provider model ID.
+`OPENAI_API_BASE` is only for an OpenAI-compatible gateway; omit it otherwise.
+
 ### Step 2: Verify Deployment
 - Go to https://nephro-delta.vercel.app (or your production domain)
 - Navigate to `/imaging` page
@@ -155,6 +161,23 @@ If analysis takes >15s, check Vercel function logs for timeout or provider error
 - Both services may be down (rare)
 - Check logs for error codes and retry
 
+## 💬 Chat Endpoint
+
+`POST /api/imaging/chat` (`{imageDataUrl, modality, question, deidentifiedConfirmed, priorReport?}`)
+answers questions about a visible image within the same non-diagnostic
+boundaries as analyze; an optional `priorReport` JSON is referenced if
+provided. Response: `{answer, provider, model}`. Same guards as analyze:
+consent flag, modality allowlist, PNG/JPEG/WebP ≤ 4 MB, rate limits, no-store.
+
+## ⏱️ Rate Limits & Payload Guards
+
+- Per-IP in-memory sliding window: **6 analyze/min**, **20 chat/min**; excess
+  gets HTTP 429 with a friendly message. Each serverless instance tracks its
+  own window, so limits are per-instance (documented trade-off).
+- Decoded size limit 4 MB for provider review; a content-length header guard
+  rejects oversized requests with 413 before parsing.
+- Responses and provider fetches use `no-store`; images are never persisted.
+
 ## 🔐 API Key Security
 
 **What we do:**
@@ -205,6 +228,6 @@ Set up Vercel alerts for:
 
 ---
 
-**Last updated:** August 14, 2026
-**Status:** Ready for production
+**Last updated:** August 16, 2026
+**Status:** awaiting integrator verification of the imaging upgrade (tests, typecheck, build)
 **API Keys:** Stored in Vercel environment (not in repo)

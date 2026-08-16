@@ -14,3 +14,5 @@ dist
 shots-*.png
 diag-out.txt
 hist-out.txt
+.vercel
+.env*
