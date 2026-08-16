@@ -50,7 +50,9 @@ export type RecordRow = {
 };
 
 async function ensureTable(sql: Sql) {
-  await sql`${SCHEMA}`;
+  // sql`${SCHEMA}` would send the DDL as a PARAMETER ("$1") — Postgres rejects
+  // it with 'syntax error at or near "$1"'. Raw DDL goes through .query().
+  await sql.query(SCHEMA, []);
 }
 
 export async function listRecords(): Promise<RecordRow[]> {
